@@ -6,6 +6,7 @@ from mode7 import Mode7
 
 class App:
     def __init__(self):
+        pg.init()
         self.screen = pg.display.set_mode(WIN_RES)
         self.clock = pg.time.Clock()
         self.mode7 = Mode7(self)

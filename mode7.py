@@ -4,10 +4,56 @@ from settings import *
 from numba import njit, prange
 
 
+class Player:
+    def __init__(self, start_pos):
+        self.pos = np.array(start_pos, dtype=np.float32)
+        self.speed = 0.0
+        self.angle = 0.0
+        self.turn_input = 0.0
+
+    def update(self):
+        keys = pg.key.get_pressed()
+        accelerating = keys[pg.K_w] or keys[pg.K_UP]
+        braking = keys[pg.K_s] or keys[pg.K_DOWN]
+
+        if accelerating:
+            self.speed += PLAYER_ACCEL
+        elif braking:
+            self.speed -= PLAYER_BRAKE
+        else:
+            self._apply_friction()
+
+        max_reverse = -PLAYER_MAX_SPEED * PLAYER_REVERSE_RATIO
+        self.speed = np.clip(self.speed, max_reverse, PLAYER_MAX_SPEED)
+
+        turn_dir = 0.0
+        if keys[pg.K_LEFT]:
+            turn_dir -= 1.0
+        if keys[pg.K_RIGHT]:
+            turn_dir += 1.0
+        self.turn_input = turn_dir
+
+        if turn_dir and self.speed:
+            steer_scale = PLAYER_STEER_SPEED * (0.35 + abs(self.speed) / PLAYER_MAX_SPEED)
+            self.angle += turn_dir * steer_scale
+
+        cos_a = np.cos(self.angle)
+        sin_a = np.sin(self.angle)
+        self.pos[0] += cos_a * self.speed
+        self.pos[1] += sin_a * self.speed
+
+    def _apply_friction(self):
+        if self.speed > 0.0:
+            self.speed = max(0.0, self.speed - PLAYER_FRICTION)
+        elif self.speed < 0.0:
+            self.speed = min(0.0, self.speed + PLAYER_FRICTION)
+
+
 class Mode7:
     def __init__(self, app):
         self.app = app
-        self.floor_tex = pg.image.load('textures/floor_2.png').convert()
+        self.floor_tex = pg.image.load('textures/floor_0.png').convert()
+        self.floor_tex = pg.transform.scale(self.floor_tex, (1920, 1920))
         self.tex_size = self.floor_tex.get_size()
         self.floor_array = pg.surfarray.array3d(self.floor_tex)
 
@@ -17,17 +63,55 @@ class Mode7:
 
         self.screen_array = pg.surfarray.array3d(pg.Surface(WIN_RES))
 
-        self.alt = 1.0
-        self.angle = 0.0
-        self.pos = np.array([0.0, 0.0])
+        self.player = Player(PLAYER_START_POS)
+        self.alt = CAM_ALT
+
+        pg.font.init()
+        try:
+            self.hud_font = pg.font.SysFont('Consolas', 26)
+        except Exception:
+            self.hud_font = None
 
     def update(self):
-        self.movement()
+        self.player.update()
         self.screen_array = self.render_frame(self.floor_array, self.ceil_array, self.screen_array,
-                                              self.tex_size, self.angle, self.pos, self.alt)
+                                              self.tex_size, self.player.angle, self.player.pos, self.alt)
 
     def draw(self):
         pg.surfarray.blit_array(self.app.screen, self.screen_array)
+        self.draw_vehicle()
+        self.draw_hud()
+
+    def draw_vehicle(self):
+        center = pg.Vector2(HALF_WIDTH, int(HEIGHT * 0.75))
+        base_shape = [
+            pg.Vector2(0, -50),
+            pg.Vector2(28, 18),
+            pg.Vector2(0, 30),
+            pg.Vector2(-28, 18),
+        ]
+        canopy = [
+            pg.Vector2(0, -30),
+            pg.Vector2(10, 4),
+            pg.Vector2(-10, 4),
+        ]
+        lean = self.player.turn_input * 0.3
+        hull_pts = [center + point.rotate_rad(lean) for point in base_shape]
+        canopy_pts = [center + point.rotate_rad(lean) for point in canopy]
+
+        pg.draw.polygon(self.app.screen, (60, 180, 255), hull_pts)
+        pg.draw.polygon(self.app.screen, (15, 35, 80), hull_pts, width=2)
+        pg.draw.polygon(self.app.screen, (255, 255, 255), canopy_pts)
+
+    def draw_hud(self):
+        if not self.hud_font:
+            return
+        speed_ratio = min(abs(self.player.speed) / PLAYER_MAX_SPEED, 1.0)
+        pseudo_kmh = int(speed_ratio * 500)
+        speed_text = self.hud_font.render(f'Speed {pseudo_kmh}', True, (255, 255, 255))
+        info_text = self.hud_font.render('W accel | S brake | arrows steer', True, (200, 200, 200))
+        self.app.screen.blit(speed_text, (20, 20))
+        self.app.screen.blit(info_text, (20, 50))
 
     @staticmethod
     @njit(fastmath=True, parallel=True)
@@ -85,36 +169,3 @@ class Mode7:
 
         return screen_array
 
-    def movement(self):
-        sin_a = np.sin(self.angle)
-        cos_a = np.cos(self.angle)
-        dx, dy = 0, 0
-        speed_sin = SPEED * sin_a
-        speed_cos = SPEED * cos_a
-
-        keys = pg.key.get_pressed()
-        if keys[pg.K_w]:
-            dx += speed_cos
-            dy += speed_sin
-        if keys[pg.K_s]:
-            dx += -speed_cos
-            dy += -speed_sin
-        if keys[pg.K_a]:
-            dx += speed_sin
-            dy += -speed_cos
-        if keys[pg.K_d]:
-            dx += -speed_sin
-            dy += speed_cos
-        self.pos[0] += dx
-        self.pos[1] += dy
-
-        if keys[pg.K_LEFT]:
-            self.angle -= SPEED
-        if keys[pg.K_RIGHT]:
-            self.angle += SPEED
-
-        if keys[pg.K_q]:
-            self.alt += SPEED
-        if keys[pg.K_e]:
-            self.alt -= SPEED
-        self.alt = min(max(self.alt, 0.3), 4.0)
