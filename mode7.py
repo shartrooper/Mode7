@@ -35,7 +35,7 @@ class Player:
 
         if turn_dir and self.speed:
             steer_scale = PLAYER_STEER_SPEED * (0.35 + abs(self.speed) / PLAYER_MAX_SPEED)
-            self.angle += turn_dir * steer_scale
+            self.angle -= turn_dir * steer_scale
 
         cos_a = np.cos(self.angle)
         sin_a = np.sin(self.angle)
@@ -52,8 +52,7 @@ class Player:
 class Mode7:
     def __init__(self, app):
         self.app = app
-        self.floor_tex = pg.image.load('textures/floor_0.png').convert()
-        self.floor_tex = pg.transform.scale(self.floor_tex, (1920, 1920))
+        self.floor_tex = pg.image.load('textures/track_4.png').convert()
         self.tex_size = self.floor_tex.get_size()
         self.floor_array = pg.surfarray.array3d(self.floor_tex)
 
@@ -65,6 +64,7 @@ class Mode7:
 
         self.player = Player(PLAYER_START_POS)
         self.alt = CAM_ALT
+        self.cam_distance = CAM_DISTANCE
 
         pg.font.init()
         try:
@@ -74,8 +74,14 @@ class Mode7:
 
     def update(self):
         self.player.update()
+        cam_offset = np.array([
+            -self.cam_distance * np.cos(self.player.angle),
+            -self.cam_distance * np.sin(self.player.angle)
+        ])
+        cam_pos = self.player.pos + cam_offset
+
         self.screen_array = self.render_frame(self.floor_array, self.ceil_array, self.screen_array,
-                                              self.tex_size, self.player.angle, self.player.pos, self.alt)
+                                              self.tex_size, self.player.angle, cam_pos, self.alt)
 
     def draw(self):
         pg.surfarray.blit_array(self.app.screen, self.screen_array)
@@ -119,53 +125,34 @@ class Mode7:
 
         sin, cos = np.sin(angle), np.cos(angle)
 
-        # iterating over the screen array
         for i in prange(WIDTH):
-            new_alt = alt
-            for j in range(HALF_HEIGHT, HEIGHT):
+            # ceiling / background up to horizon
+            for j in range(0, STD_HORIZON):
+                screen_array[i][j] = ceil_array[(i - int(angle * BACKGROUND_ROTATION_SPEED)) % tex_size[0]][j % tex_size[1]]
+
+            # floor render from horizon to bottom
+            for j in range(STD_HORIZON, HEIGHT):
                 x = HALF_WIDTH - i
                 y = j + FOCAL_LEN
-                z = j - HALF_HEIGHT + new_alt
+                z = j - STD_HORIZON + 0.01
 
-                # rotation
-                px = (x * cos - y * sin)
-                py = (x * sin + y * cos)
+                rx = x * cos + y * sin
+                ry = -x * sin + y * cos
 
-                # floor projection and transformation
-                floor_x = px / z - player_pos[1]
-                floor_y = py / z + player_pos[0]
+                px = (rx / z + player_pos[1]) * SCALE
+                py = (ry / z + player_pos[0]) * SCALE
 
-                # floor pos and color
-                floor_pos = int(floor_x * SCALE % tex_size[0]), int(floor_y * SCALE % tex_size[1])
+                floor_pos = int(px % tex_size[0]), int(py % tex_size[1])
                 floor_col = floor_array[floor_pos]
 
-                # ceil projection and transformation
-                ceil_x = alt * px / z - player_pos[1] * 0.3
-                ceil_y = alt * py / z + player_pos[0] * 0.3
+                attenuation = min(max(7.5 * (abs(z) / HALF_HEIGHT), 0), 1)
+                fog = (1 - attenuation) * FOG_DENSITY
 
-                # ceil pos and color
-                ceil_pos = int(ceil_x * SCALE % tex_size[0]), int(ceil_y * SCALE % tex_size[1])
-                ceil_col = ceil_array[ceil_pos]
+                floor_col = (floor_col[0] * attenuation + fog,
+                             floor_col[1] * attenuation + fog,
+                             floor_col[2] * attenuation + fog)
 
-                # shading
-                # depth = 4 * abs(z) / HALF_HEIGHT
-                depth = min(max(2.5 * (abs(z) / HALF_HEIGHT), 0), 1)
-                fog = (1 - depth) * 230
-
-                floor_col = (floor_col[0] * depth + fog,
-                             floor_col[1] * depth + fog,
-                             floor_col[2] * depth + fog)
-
-                ceil_col = (ceil_col[0] * depth + fog,
-                            ceil_col[1] * depth + fog,
-                            ceil_col[2] * depth + fog)
-
-                # fill screen array
                 screen_array[i, j] = floor_col
-                screen_array[i, -j] = ceil_col
-
-                # next depth
-                new_alt += alt
 
         return screen_array
 

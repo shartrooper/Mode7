@@ -1,9 +1,14 @@
 # settings
-WIN_RES = WIDTH, HEIGHT = 1600, 900
-# WIN_RES = WIDTH, HEIGHT = 1920, 1080
+WIN_RES = WIDTH, HEIGHT = 800, 600
 HALF_WIDTH, HALF_HEIGHT = WIDTH // 2, HEIGHT // 2
 FOCAL_LEN = 250
-SCALE = 100
+
+# renderer tuning mirrored from mode7-racer
+STD_HORIZON = HALF_HEIGHT // 2
+CAM_DISTANCE = 4
+SCALE = 20
+FOG_DENSITY = 100
+BACKGROUND_ROTATION_SPEED = 120
 
 # camera altitude keeps us glued to the track
 CAM_ALT = 0.9
