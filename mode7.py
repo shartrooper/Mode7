@@ -8,7 +8,7 @@ class Player:
     def __init__(self, start_pos):
         self.pos = np.array(start_pos, dtype=np.float32)
         self.speed = 0.0
-        self.angle = 0.0
+        self.angle = np.pi/2
         self.turn_input = 0.0
 
     def update(self):

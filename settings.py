@@ -14,7 +14,8 @@ BACKGROUND_ROTATION_SPEED = 120
 CAM_ALT = 0.9
 
 # player tuning constants
-PLAYER_START_POS = (0.0, 4.0)
+# Starting position is 1640 x 550 divided by scale
+PLAYER_START_POS = (550 / SCALE, 1640 / SCALE)
 PLAYER_MAX_SPEED = 0.04
 PLAYER_ACCEL = 0.00035
 PLAYER_BRAKE = 0.00045
