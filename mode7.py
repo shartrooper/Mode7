@@ -10,6 +10,8 @@ class Player:
         self.speed = 0.0
         self.angle = np.pi/2
         self.turn_input = 0.0
+        self.shift_force = 0.0
+        self.shift_dir = 0
 
     def update(self):
         keys = pg.key.get_pressed()
@@ -39,8 +41,32 @@ class Player:
 
         cos_a = np.cos(self.angle)
         sin_a = np.sin(self.angle)
+
+        shift_left = keys[pg.K_q]
+        shift_right = keys[pg.K_e]
+        shift_input = 0
+        if shift_left and not shift_right:
+            shift_input = 1
+        elif shift_right and not shift_left:
+            shift_input = -1
+
+        shift_active = abs(self.speed) > SHIFT_MIN_SPEED
+        if shift_input and shift_active:
+            self.shift_dir = shift_input
+            increment = SHIFT_INCREASE * abs(self.speed)
+            self.shift_force = min(self.shift_force + increment, SHIFT_MAX_FORCE)
+        else:
+            self.shift_force = max(0.0, self.shift_force - SHIFT_DECAY)
+            if self.shift_force == 0 or not shift_active:
+                self.shift_dir = 0
+
         self.pos[0] += cos_a * self.speed
         self.pos[1] += sin_a * self.speed
+
+        if self.shift_force and self.shift_dir and shift_active:
+            side_vec = np.array([-sin_a, cos_a], dtype=np.float32)
+            lateral = side_vec * self.shift_force * self.shift_dir
+            self.pos += lateral
 
     def _apply_friction(self):
         if self.speed > 0.0:
@@ -115,7 +141,7 @@ class Mode7:
         speed_ratio = min(abs(self.player.speed) / PLAYER_MAX_SPEED, 1.0)
         pseudo_kmh = int(speed_ratio * 500)
         speed_text = self.hud_font.render(f'Speed {pseudo_kmh}', True, (255, 255, 255))
-        info_text = self.hud_font.render('W accel | S brake | arrows steer', True, (200, 200, 200))
+        info_text = self.hud_font.render('W accel | S brake | Q shift left | E shift right | arrows steer', True, (200, 200, 200))
         self.app.screen.blit(speed_text, (20, 20))
         self.app.screen.blit(info_text, (20, 50))
 
