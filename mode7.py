@@ -16,17 +16,19 @@ class Player:
     def update(self, dt):
         keys = pg.key.get_pressed()
         accelerating = keys[pg.K_SPACE]
-        braking = keys[pg.K_s] or keys[pg.K_DOWN]
+        braking = keys[pg.K_s]
 
-        if accelerating:
+        if braking:
+            if self.speed > 0:
+                self.speed = max(0, self.speed - PLAYER_BRAKE * dt)
+            elif self.speed < 0:
+                self.speed = min(0, self.speed + PLAYER_BRAKE * dt)
+        elif accelerating:
             self.speed += PLAYER_ACCEL * dt
-        elif braking:
-            self.speed -= PLAYER_BRAKE * dt
         else:
             self._apply_friction(dt)
 
-        max_reverse = -PLAYER_MAX_SPEED * PLAYER_REVERSE_RATIO
-        self.speed = np.clip(self.speed, max_reverse, PLAYER_MAX_SPEED)
+        self.speed = np.clip(self.speed, 0, PLAYER_MAX_SPEED)
 
         turn_dir = 0.0
         if keys[pg.K_LEFT]:
@@ -71,8 +73,6 @@ class Player:
     def _apply_friction(self, dt):
         if self.speed > 0.0:
             self.speed = max(0.0, self.speed - PLAYER_FRICTION * dt)
-        elif self.speed < 0.0:
-            self.speed = min(0.0, self.speed + PLAYER_FRICTION * dt)
 
 
 class Mode7:
@@ -141,7 +141,7 @@ class Mode7:
         speed_ratio = min(abs(self.player.speed) / PLAYER_MAX_SPEED, 1.0)
         pseudo_kmh = int(speed_ratio * 500)
         speed_text = self.hud_font.render(f'Speed {pseudo_kmh}', True, (255, 255, 255))
-        info_text = self.hud_font.render('SPACE accel | S brake | Q shift left | E shift right | arrows steer', True, (200, 200, 200))
+        info_text = self.hud_font.render('SPACE accel | S brake | Q/E shift | arrows steer', True, (200, 200, 200))
         self.app.screen.blit(speed_text, (20, 20))
         self.app.screen.blit(info_text, (20, 50))
 
