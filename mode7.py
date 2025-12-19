@@ -13,17 +13,17 @@ class Player:
         self.shift_force = 0.0
         self.shift_dir = 0
 
-    def update(self):
+    def update(self, dt):
         keys = pg.key.get_pressed()
         accelerating = keys[pg.K_SPACE]
         braking = keys[pg.K_s] or keys[pg.K_DOWN]
 
         if accelerating:
-            self.speed += PLAYER_ACCEL
+            self.speed += PLAYER_ACCEL * dt
         elif braking:
-            self.speed -= PLAYER_BRAKE
+            self.speed -= PLAYER_BRAKE * dt
         else:
-            self._apply_friction()
+            self._apply_friction(dt)
 
         max_reverse = -PLAYER_MAX_SPEED * PLAYER_REVERSE_RATIO
         self.speed = np.clip(self.speed, max_reverse, PLAYER_MAX_SPEED)
@@ -37,7 +37,7 @@ class Player:
 
         if turn_dir and self.speed:
             steer_scale = PLAYER_STEER_SPEED * (0.35 + abs(self.speed) / PLAYER_MAX_SPEED)
-            self.angle -= turn_dir * steer_scale
+            self.angle -= turn_dir * steer_scale * dt
 
         cos_a = np.cos(self.angle)
         sin_a = np.sin(self.angle)
@@ -53,26 +53,26 @@ class Player:
         shift_active = abs(self.speed) > SHIFT_MIN_SPEED
         if shift_input and shift_active:
             self.shift_dir = shift_input
-            increment = SHIFT_INCREASE * abs(self.speed)
+            increment = SHIFT_INCREASE * abs(self.speed) * dt
             self.shift_force = min(self.shift_force + increment, SHIFT_MAX_FORCE)
         else:
-            self.shift_force = max(0.0, self.shift_force - SHIFT_DECAY)
+            self.shift_force = max(0.0, self.shift_force - SHIFT_DECAY * dt)
             if self.shift_force == 0 or not shift_active:
                 self.shift_dir = 0
 
-        self.pos[0] += cos_a * self.speed
-        self.pos[1] += sin_a * self.speed
+        self.pos[0] += cos_a * self.speed * dt
+        self.pos[1] += sin_a * self.speed * dt
 
         if self.shift_force and self.shift_dir and shift_active:
             side_vec = np.array([-sin_a, cos_a], dtype=np.float32)
-            lateral = side_vec * self.shift_force * self.shift_dir
+            lateral = side_vec * self.shift_force * self.shift_dir * dt
             self.pos += lateral
 
-    def _apply_friction(self):
+    def _apply_friction(self, dt):
         if self.speed > 0.0:
-            self.speed = max(0.0, self.speed - PLAYER_FRICTION)
+            self.speed = max(0.0, self.speed - PLAYER_FRICTION * dt)
         elif self.speed < 0.0:
-            self.speed = min(0.0, self.speed + PLAYER_FRICTION)
+            self.speed = min(0.0, self.speed + PLAYER_FRICTION * dt)
 
 
 class Mode7:
@@ -98,8 +98,8 @@ class Mode7:
         except Exception:
             self.hud_font = None
 
-    def update(self):
-        self.player.update()
+    def update(self, dt):
+        self.player.update(dt)
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
             -self.cam_distance * np.sin(self.player.angle)
