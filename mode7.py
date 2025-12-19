@@ -15,7 +15,7 @@ class Player:
 
     def update(self):
         keys = pg.key.get_pressed()
-        accelerating = keys[pg.K_w] or keys[pg.K_UP]
+        accelerating = keys[pg.K_SPACE]
         braking = keys[pg.K_s] or keys[pg.K_DOWN]
 
         if accelerating:
@@ -141,7 +141,7 @@ class Mode7:
         speed_ratio = min(abs(self.player.speed) / PLAYER_MAX_SPEED, 1.0)
         pseudo_kmh = int(speed_ratio * 500)
         speed_text = self.hud_font.render(f'Speed {pseudo_kmh}', True, (255, 255, 255))
-        info_text = self.hud_font.render('W accel | S brake | Q shift left | E shift right | arrows steer', True, (200, 200, 200))
+        info_text = self.hud_font.render('SPACE accel | S brake | Q shift left | E shift right | arrows steer', True, (200, 200, 200))
         self.app.screen.blit(speed_text, (20, 20))
         self.app.screen.blit(info_text, (20, 50))
 
