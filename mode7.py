@@ -1,12 +1,14 @@
 import pygame as pg
 import numpy as np
 from settings import *
+from machine import DOPAMINE_FALCON
 from numba import njit, prange
 
 
 class Player:
-    def __init__(self, start_pos):
+    def __init__(self, start_pos, machine):
         self.pos = np.array(start_pos, dtype=np.float32)
+        self.machine = machine
         self.speed = 0.0
         self.angle = np.pi/2
         self.turn_input = 0.0
@@ -20,15 +22,15 @@ class Player:
 
         if braking:
             if self.speed > 0:
-                self.speed = max(0, self.speed - PLAYER_BRAKE * dt)
+                self.speed = max(0, self.speed - self.machine.brake * dt)
             elif self.speed < 0:
-                self.speed = min(0, self.speed + PLAYER_BRAKE * dt)
+                self.speed = min(0, self.speed + self.machine.brake * dt)
         elif accelerating:
-            self.speed += PLAYER_ACCEL * dt
+            self.speed += self.machine.accel * dt
         else:
             self._apply_friction(dt)
 
-        self.speed = np.clip(self.speed, 0, PLAYER_MAX_SPEED)
+        self.speed = np.clip(self.speed, 0, self.machine.max_speed)
 
         turn_dir = 0.0
         if keys[pg.K_LEFT]:
@@ -38,7 +40,7 @@ class Player:
         self.turn_input = turn_dir
 
         if turn_dir and self.speed:
-            steer_scale = PLAYER_STEER_SPEED * (0.35 + abs(self.speed) / PLAYER_MAX_SPEED)
+            steer_scale = self.machine.steer_speed * (0.35 + abs(self.speed) / self.machine.max_speed)
             self.angle -= turn_dir * steer_scale * dt
 
         cos_a = np.cos(self.angle)
@@ -52,13 +54,13 @@ class Player:
         elif shift_right and not shift_left:
             shift_input = -1
 
-        shift_active = abs(self.speed) > SHIFT_MIN_SPEED
+        shift_active = abs(self.speed) > self.machine.shift_min
         if shift_input and shift_active:
             self.shift_dir = shift_input
-            increment = SHIFT_INCREASE * abs(self.speed) * dt
-            self.shift_force = min(self.shift_force + increment, SHIFT_MAX_FORCE)
+            increment = self.machine.shift_inc * abs(self.speed) * dt
+            self.shift_force = min(self.shift_force + increment, self.machine.shift_max)
         else:
-            self.shift_force = max(0.0, self.shift_force - SHIFT_DECAY * dt)
+            self.shift_force = max(0.0, self.shift_force - self.machine.shift_decay * dt)
             if self.shift_force == 0 or not shift_active:
                 self.shift_dir = 0
 
@@ -72,7 +74,7 @@ class Player:
 
     def _apply_friction(self, dt):
         if self.speed > 0.0:
-            self.speed = max(0.0, self.speed - PLAYER_FRICTION * dt)
+            self.speed = max(0.0, self.speed - self.machine.friction * dt)
 
 
 class Mode7:
@@ -88,7 +90,7 @@ class Mode7:
 
         self.screen_array = pg.surfarray.array3d(pg.Surface(WIN_RES))
 
-        self.player = Player(PLAYER_START_POS)
+        self.player = Player(PLAYER_START_POS, DOPAMINE_FALCON)
         self.alt = CAM_ALT
         self.cam_distance = CAM_DISTANCE
 
@@ -116,29 +118,13 @@ class Mode7:
 
     def draw_vehicle(self):
         center = pg.Vector2(HALF_WIDTH, int(HEIGHT * 0.75))
-        base_shape = [
-            pg.Vector2(0, -50),
-            pg.Vector2(28, 18),
-            pg.Vector2(0, 30),
-            pg.Vector2(-28, 18),
-        ]
-        canopy = [
-            pg.Vector2(0, -30),
-            pg.Vector2(10, 4),
-            pg.Vector2(-10, 4),
-        ]
         lean = self.player.turn_input * 0.3
-        hull_pts = [center + point.rotate_rad(lean) for point in base_shape]
-        canopy_pts = [center + point.rotate_rad(lean) for point in canopy]
-
-        pg.draw.polygon(self.app.screen, (60, 180, 255), hull_pts)
-        pg.draw.polygon(self.app.screen, (15, 35, 80), hull_pts, width=2)
-        pg.draw.polygon(self.app.screen, (255, 255, 255), canopy_pts)
+        self.player.machine.draw(self.app.screen, center, lean)
 
     def draw_hud(self):
         if not self.hud_font:
             return
-        speed_ratio = min(abs(self.player.speed) / PLAYER_MAX_SPEED, 1.0)
+        speed_ratio = min(abs(self.player.speed) / self.player.machine.max_speed, 1.0)
         pseudo_kmh = int(speed_ratio * 500)
         speed_text = self.hud_font.render(f'Speed {pseudo_kmh}', True, (255, 255, 255))
         info_text = self.hud_font.render('SPACE accel | S brake | Q/E shift | arrows steer', True, (200, 200, 200))
