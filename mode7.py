@@ -14,11 +14,22 @@ class Player:
         self.turn_input = 0.0
         self.shift_force = 0.0
         self.shift_dir = 0
+        
+        # Vertical physics
+        self.z = 0.0
+        self.vz = 0.0
+        self.pitch = 0  # -1: Nose Down, 0: Level, 1: Nose Up
+        self.jump_timer = 0.0
 
     def update(self, dt):
         keys = pg.key.get_pressed()
         accelerating = keys[pg.K_SPACE]
         braking = keys[pg.K_s]
+        
+        # Immediate Pitch Control
+        if keys[pg.K_UP]: self.pitch = 1
+        elif keys[pg.K_DOWN]: self.pitch = -1
+        else: self.pitch = 0
 
         if braking:
             if self.speed > 0:
@@ -31,6 +42,26 @@ class Player:
             self._apply_friction(dt)
 
         self.speed = np.clip(self.speed, 0, self.machine.max_speed)
+
+        # Vertical Physics Simulation
+        if self.z > 0 or self.vz > 0:
+            self.jump_timer += dt
+            
+            # Simulated gravity affected by pitch
+            # Pitch Up (1) reduces gravity (glide), Pitch Down (-1) increases it (dive)
+            effective_gravity = self.machine.gravity
+            if self.pitch == 1: effective_gravity *= 0.6
+            elif self.pitch == -1: effective_gravity *= 1.6
+            
+            self.vz -= effective_gravity * dt
+            self.z += self.vz * dt
+            
+            # Airborne speed decay (Air Drag)
+            if self.speed > 0:
+                self.speed = max(0, self.speed - self.machine.air_drag * dt)
+
+            if self.z <= 0:
+                self.handle_landing()
 
         turn_dir = 0.0
         if keys[pg.K_LEFT]:
@@ -72,9 +103,32 @@ class Player:
             lateral = side_vec * self.shift_force * self.shift_dir * dt
             self.pos += lateral
 
+    def handle_landing(self):
+        # High speed + Long jump requires Nose Down for smooth landing
+        # jump_timer threshold (e.g., 60 frames/1 sec) and speed threshold (e.g., 0.08)
+        if self.jump_timer > 60 and self.speed > 0.08:
+            if self.pitch != -1:
+                self.speed *= self.machine.hard_landing_penalty
+        self.z = 0
+        self.vz = 0
+        self.jump_timer = 0
+
     def _apply_friction(self, dt):
         if self.speed > 0.0:
             self.speed = max(0.0, self.speed - self.machine.friction * dt)
+
+
+class JumpPad:
+    def __init__(self, pos, size):
+        self.pos = np.array(pos, dtype=np.float32)
+        self.size = np.array(size, dtype=np.float32)
+
+    def check_trigger(self, player):
+        if player.z == 0:
+            # Simple AABB check in world coordinates
+            if (self.pos[0] <= player.pos[1] <= self.pos[0] + self.size[0] and
+                self.pos[1] <= player.pos[0] <= self.pos[1] + self.size[1]):
+                player.vz = player.machine.jump_force
 
 
 class Mode7:
@@ -94,6 +148,11 @@ class Mode7:
         self.alt = CAM_ALT
         self.cam_distance = CAM_DISTANCE
 
+        # Jump Pads (World coordinates = Texture coordinates / SCALE)
+        self.jump_pads = [
+            JumpPad(pos=(960 / SCALE, 632 / SCALE), size=(35 / SCALE, 32 / SCALE)) 
+        ]
+
         pg.font.init()
         try:
             self.hud_font = pg.font.SysFont('Consolas', 26)
@@ -102,6 +161,11 @@ class Mode7:
 
     def update(self, dt):
         self.player.update(dt)
+        
+        # Check Jump Pad triggers
+        for pad in self.jump_pads:
+            pad.check_trigger(self.player)
+
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
             -self.cam_distance * np.sin(self.player.angle)
@@ -118,6 +182,9 @@ class Mode7:
 
     def draw_vehicle(self):
         center = pg.Vector2(HALF_WIDTH, int(HEIGHT * 0.75))
+        # Visual altitude offset (scaling z for screen pixels)
+        center.y -= self.player.z * 1500
+        
         lean = self.player.turn_input * 0.3
         self.player.machine.draw(self.app.screen, center, lean)
 
@@ -127,9 +194,22 @@ class Mode7:
         speed_ratio = min(abs(self.player.speed) / self.player.machine.max_speed, 1.0)
         pseudo_kmh = int(speed_ratio * 500)
         speed_text = self.hud_font.render(f'Speed {pseudo_kmh}', True, (255, 255, 255))
-        info_text = self.hud_font.render('SPACE accel | S brake | Q/E shift | arrows steer', True, (200, 200, 200))
+        
+        # Altitude and Pitch display
+        z_text = self.hud_font.render(f'Z: {self.player.z:.2f}', True, (255, 255, 0))
+        pitch_str = "LEVEL" if self.player.pitch == 0 else ("UP" if self.player.pitch == 1 else "DOWN")
+        pitch_text = self.hud_font.render(f'Pitch: {pitch_str}', True, (0, 255, 255))
+        
+        # Debug Coordinates (Texture Space)
+        pos_text = self.hud_font.render(f'TexPos: {int(self.player.pos[1]*SCALE)}, {int(self.player.pos[0]*SCALE)}', True, (255, 100, 100))
+        
+        info_text = self.hud_font.render('SPACE accel | S brake | Q/E shift | ARROWS steer/pitch', True, (200, 200, 200))
+        
         self.app.screen.blit(speed_text, (20, 20))
-        self.app.screen.blit(info_text, (20, 50))
+        self.app.screen.blit(z_text, (20, 50))
+        self.app.screen.blit(pitch_text, (20, 80))
+        self.app.screen.blit(pos_text, (20, 110))
+        self.app.screen.blit(info_text, (20, 140))
 
     @staticmethod
     @njit(fastmath=True, parallel=True)
