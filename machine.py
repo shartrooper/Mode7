@@ -4,7 +4,7 @@ class Machine:
     def __init__(self, 
                  max_speed, accel, brake, friction, steer_speed,
                  shift_max, shift_inc, shift_decay, shift_min,
-                 gravity, jump_force, air_drag, hard_landing_penalty,
+                 gravity, jump_force, hard_landing_penalty,
                  hull_points, canopy_points, hull_color, edge_color, canopy_color):
         # Physics
         self.max_speed = max_speed
@@ -16,7 +16,6 @@ class Machine:
         # Jumping/Landing
         self.gravity = gravity
         self.jump_force = jump_force
-        self.air_drag = air_drag
         self.hard_landing_penalty = hard_landing_penalty
         
         # Shift/Strafe
@@ -54,7 +53,6 @@ DOPAMINE_FALCON = Machine(
     shift_min=0.005,
     gravity=0.0005,
     jump_force=0.015,
-    air_drag=0.0004,
     hard_landing_penalty=0.5,
     hull_points=[(0, -50), (28, 18), (0, 30), (-28, 18)],
     canopy_points=[(0, -30), (10, 4), (-10, 4)],
