@@ -44,7 +44,7 @@ class Machine:
 # Instance with current settings
 DOPAMINE_FALCON = Machine(
     max_speed=0.12,
-    accel=0.003,
+    accel=0.0005,
     brake=0.01,
     friction=0.0008,
     steer_speed=0.015,

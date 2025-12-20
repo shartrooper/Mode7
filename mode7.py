@@ -33,28 +33,32 @@ class Player:
 
         # Movement Logic
         if self.z > 0:
-            # Airborne speed logic
+            # Airborne speed logic: Air should preserve momentum BETTER than ground
             if braking:
                 self.speed = max(0, self.speed - self.machine.brake * 0.5 * dt)
             elif accelerating:
-                # Accelerating in air is weaker
-                self.speed += self.machine.accel * 0.3 * dt
+                # Accelerating in air is weaker than ground
+                self.speed += self.machine.accel * 0.4 * dt
             
-            # Stronger drag if exceeding a "natural" air speed
-            air_speed_limit = self.machine.max_speed * 0.7
-            drag_mult = 4.0 if self.speed > air_speed_limit else 1.0
-            self.speed = max(0, self.speed - self.machine.air_drag * drag_mult * dt)
+            # Dynamic Air Drag: Lower than ground friction (5.5)
+            # If gliding (Pitch -1), drag is reduced even further to maintain momentum
+            air_drag_factor = 1.5 if self.pitch == -1 else 3.0
+            drag = self.speed * (self.machine.friction * air_drag_factor) * dt
+            self.speed = max(0, self.speed - drag)
         else:
-            # Ground speed logic
+            # Ground speed logic: Apply acceleration and braking
             if braking:
-                if self.speed > 0:
-                    self.speed = max(0, self.speed - self.machine.brake * dt)
-                elif self.speed < 0:
-                    self.speed = min(0, self.speed + self.machine.brake * dt)
+                self.speed = max(0, self.speed - self.machine.brake * dt)
             elif accelerating:
                 self.speed += self.machine.accel * dt
-            else:
-                self._apply_friction(dt)
+            
+            # ALWAYS Apply Drag (Proportional Friction)
+            drag = self.speed * (self.machine.friction * 5.5) * dt
+            self.speed = max(0, self.speed - drag)
+            
+            # Rolling Resistance: If not accelerating/braking, add a small flat speed loss
+            if not accelerating and not braking and self.speed > 0:
+                self.speed = max(0, self.speed - self.machine.friction * 0.4 * dt)
 
         self.speed = np.clip(self.speed, 0, self.machine.max_speed)
 
@@ -132,10 +136,6 @@ class Player:
         self.z = 0
         self.vz = 0
         self.jump_timer = 0
-
-    def _apply_friction(self, dt):
-        if self.speed > 0.0:
-            self.speed = max(0.0, self.speed - self.machine.friction * dt)
 
 
 class JumpPad:
