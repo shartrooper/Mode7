@@ -64,8 +64,8 @@ class Player:
             
             # Simulated gravity affected by pitch
             effective_gravity = self.machine.gravity
-            if self.pitch == 1: effective_gravity *= 0.6
-            elif self.pitch == -1: effective_gravity *= 1.6
+            if self.pitch == -1: effective_gravity *= 0.6
+            elif self.pitch == 1: effective_gravity *= 1.6
             
             self.vz -= effective_gravity * dt
             self.z += self.vz * dt
