@@ -31,15 +31,30 @@ class Player:
         elif keys[pg.K_DOWN]: self.pitch = -1
         else: self.pitch = 0
 
-        if braking:
-            if self.speed > 0:
-                self.speed = max(0, self.speed - self.machine.brake * dt)
-            elif self.speed < 0:
-                self.speed = min(0, self.speed + self.machine.brake * dt)
-        elif accelerating:
-            self.speed += self.machine.accel * dt
+        # Movement Logic
+        if self.z > 0:
+            # Airborne speed logic
+            if braking:
+                self.speed = max(0, self.speed - self.machine.brake * 0.5 * dt)
+            elif accelerating:
+                # Accelerating in air is weaker
+                self.speed += self.machine.accel * 0.3 * dt
+            
+            # Stronger drag if exceeding a "natural" air speed
+            air_speed_limit = self.machine.max_speed * 0.7
+            drag_mult = 4.0 if self.speed > air_speed_limit else 1.0
+            self.speed = max(0, self.speed - self.machine.air_drag * drag_mult * dt)
         else:
-            self._apply_friction(dt)
+            # Ground speed logic
+            if braking:
+                if self.speed > 0:
+                    self.speed = max(0, self.speed - self.machine.brake * dt)
+                elif self.speed < 0:
+                    self.speed = min(0, self.speed + self.machine.brake * dt)
+            elif accelerating:
+                self.speed += self.machine.accel * dt
+            else:
+                self._apply_friction(dt)
 
         self.speed = np.clip(self.speed, 0, self.machine.max_speed)
 
@@ -48,17 +63,12 @@ class Player:
             self.jump_timer += dt
             
             # Simulated gravity affected by pitch
-            # Pitch Up (1) reduces gravity (glide), Pitch Down (-1) increases it (dive)
             effective_gravity = self.machine.gravity
             if self.pitch == 1: effective_gravity *= 0.6
             elif self.pitch == -1: effective_gravity *= 1.6
             
             self.vz -= effective_gravity * dt
             self.z += self.vz * dt
-            
-            # Airborne speed decay (Air Drag)
-            if self.speed > 0:
-                self.speed = max(0, self.speed - self.machine.air_drag * dt)
 
             if self.z <= 0:
                 self.handle_landing()
@@ -105,10 +115,20 @@ class Player:
 
     def handle_landing(self):
         # High speed + Long jump requires Nose Down for smooth landing
-        # jump_timer threshold (e.g., 60 frames/1 sec) and speed threshold (e.g., 0.08)
-        if self.jump_timer > 60 and self.speed > 0.08:
-            if self.pitch != -1:
+        # Test 3: +200 kmh speed threshold (approx 0.048 in engine units)
+        # Test 3: > 1.0s jump duration threshold (approx 60 frames)
+        
+        speed_threshold = self.machine.max_speed * 0.4  # 0.048 for 200 kmh
+        time_threshold = 50  # Slightly less than 60 to be generous
+        
+        if self.jump_timer > time_threshold and self.speed > speed_threshold:
+            if self.pitch == -1:
+                # Smooth Landing: insignficant loss
+                self.speed *= 0.98
+            else:
+                # Hard Landing: sharp loss
                 self.speed *= self.machine.hard_landing_penalty
+        
         self.z = 0
         self.vz = 0
         self.jump_timer = 0
