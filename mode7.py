@@ -186,6 +186,10 @@ class Mode7:
         speed_ratio = self.player.speed / self.player.machine.max_speed
         dynamic_focal_len = FOCAL_LEN - (speed_ratio * 40)
 
+        shake = 0
+        if speed_ratio > 0.8:
+            shake = np.random.uniform(-1, 1) * (speed_ratio - 0.8) * 5
+
         # Check Jump Pad triggers
         for pad in self.jump_pads:
             pad.check_trigger(self.player)
@@ -198,7 +202,7 @@ class Mode7:
 
         self.screen_array = self.render_frame(self.floor_array, self.ceil_array, self.screen_array,
                                               self.tex_size, self.player.angle, cam_pos, 
-                                              self.alt + (self.player.z * 0.1), dynamic_focal_len)
+                                              self.alt + (self.player.z * 0.1), dynamic_focal_len + shake)
 
     def draw(self):
         pg.surfarray.blit_array(self.app.screen, self.screen_array)
@@ -207,8 +211,18 @@ class Mode7:
 
     def draw_vehicle(self):
         center = pg.Vector2(HALF_WIDTH, int(HEIGHT * 0.75))
-        # Visual altitude offset (scaling z for screen pixels)
-        center.y -= self.player.z * 1500
+        
+        # Engine Shudder based on speed ratio
+        speed_ratio = self.player.speed / self.player.machine.max_speed
+        shudder_x, shudder_y = 0, 0
+        if speed_ratio > 0.1:
+            intensity = speed_ratio * 1.5
+            shudder_x = np.random.uniform(-intensity, intensity)
+            shudder_y = np.random.uniform(-intensity, intensity)
+
+        # Visual altitude offset and engine shudder
+        center.y -= (self.player.z * 1500) + shudder_y
+        center.x += shudder_x
         
         lean = self.player.turn_input * 0.3
         self.player.machine.draw(self.app.screen, center, lean)
