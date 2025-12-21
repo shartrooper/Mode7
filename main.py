@@ -1,18 +1,21 @@
 import pygame as pg
 import sys
-from settings import WIN_RES
+from settings import WIN_RES, FPS
 from mode7 import Mode7
 
 
 class App:
     def __init__(self):
+        pg.init()
         self.screen = pg.display.set_mode(WIN_RES)
         self.clock = pg.time.Clock()
+        self.dt = 1.0
         self.mode7 = Mode7(self)
 
     def update(self):
-        self.mode7.update()
-        self.clock.tick()
+        # delta time in seconds, normalized to 60 FPS
+        self.dt = self.clock.tick(FPS) * 0.001 * 60
+        self.mode7.update(self.dt)
         pg.display.set_caption(f'{self.clock.get_fps() : .1f}')
 
     def draw(self):

@@ -1,8 +1,21 @@
 # settings
-
-# WIN_RES = WIDTH, HEIGHT = 1600, 900
-WIN_RES = WIDTH, HEIGHT = 1920, 1080
+WIN_RES = WIDTH, HEIGHT = 800, 600
 HALF_WIDTH, HALF_HEIGHT = WIDTH // 2, HEIGHT // 2
-FOCAL_LEN = 250
-SCALE = 100
-SPEED = 0.01
+FOCAL_LEN = 140
+
+# renderer tuning mirrored from mode7-racer
+STD_HORIZON = HALF_HEIGHT
+CAM_DISTANCE = 4
+SCALE = 64
+FOG_DENSITY = 120
+BACKGROUND_ROTATION_SPEED = 120
+
+# camera altitude keeps us glued to the track
+CAM_ALT = 0.5
+
+# Framerate Cap
+FPS = 60
+
+# player tuning constants
+# Starting position is 1640 x 550 divided by scale
+PLAYER_START_POS = (550 / SCALE, 1640 / SCALE)
