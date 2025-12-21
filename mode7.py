@@ -182,6 +182,10 @@ class Mode7:
     def update(self, dt):
         self.player.update(dt)
         
+        # Dynamic FOV: focal length decreases as speed increases
+        speed_ratio = self.player.speed / self.player.machine.max_speed
+        dynamic_focal_len = FOCAL_LEN - (speed_ratio * 40)
+
         # Check Jump Pad triggers
         for pad in self.jump_pads:
             pad.check_trigger(self.player)
@@ -193,7 +197,8 @@ class Mode7:
         cam_pos = self.player.pos + cam_offset
 
         self.screen_array = self.render_frame(self.floor_array, self.ceil_array, self.screen_array,
-                                              self.tex_size, self.player.angle, cam_pos, self.alt)
+                                              self.tex_size, self.player.angle, cam_pos, 
+                                              self.alt + (self.player.z * 0.1), dynamic_focal_len)
 
     def draw(self):
         pg.surfarray.blit_array(self.app.screen, self.screen_array)
@@ -233,7 +238,7 @@ class Mode7:
 
     @staticmethod
     @njit(fastmath=True, parallel=True)
-    def render_frame(floor_array, ceil_array, screen_array, tex_size, angle, player_pos, alt):
+    def render_frame(floor_array, ceil_array, screen_array, tex_size, angle, player_pos, alt, focal_len):
 
         sin, cos = np.sin(angle), np.cos(angle)
 
@@ -245,14 +250,15 @@ class Mode7:
             # floor render from horizon to bottom
             for j in range(STD_HORIZON, HEIGHT):
                 x = HALF_WIDTH - i
-                y = j + FOCAL_LEN
+                y = j + focal_len
                 z = j - STD_HORIZON + 0.01
 
                 rx = x * cos + y * sin
                 ry = -x * sin + y * cos
 
-                px = (rx / z + player_pos[1]) * SCALE
-                py = (ry / z + player_pos[0]) * SCALE
+                # Apply altitude to the projection
+                px = (alt * rx / z + player_pos[1]) * SCALE
+                py = (alt * ry / z + player_pos[0]) * SCALE
 
                 floor_pos = int(px % tex_size[0]), int(py % tex_size[1])
                 floor_col = floor_array[floor_pos]

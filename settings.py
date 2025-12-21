@@ -6,12 +6,12 @@ FOCAL_LEN = 140
 # renderer tuning mirrored from mode7-racer
 STD_HORIZON = HALF_HEIGHT
 CAM_DISTANCE = 4
-SCALE = 48
+SCALE = 64
 FOG_DENSITY = 120
 BACKGROUND_ROTATION_SPEED = 120
 
 # camera altitude keeps us glued to the track
-CAM_ALT = 0.9
+CAM_ALT = 0.5
 
 # Framerate Cap
 FPS = 60
