@@ -165,6 +165,7 @@ class Mode7:
         self.screen_array = pg.surfarray.array3d(pg.Surface(WIN_RES))
 
         self.player = Player(PLAYER_START_POS, DOPAMINE_FALCON)
+        self.player.machine.load_assets()
         self.alt = CAM_ALT
         self.cam_distance = CAM_DISTANCE
 

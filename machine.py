@@ -5,7 +5,8 @@ class Machine:
                  max_speed, accel, brake, friction, steer_speed,
                  shift_max, shift_inc, shift_decay, shift_min,
                  gravity, jump_force, hard_landing_penalty,
-                 hull_points, canopy_points, hull_color, edge_color, canopy_color):
+                 hull_points, canopy_points, hull_color, edge_color, canopy_color,
+                 sprite_path=None, sprite_scale=1.0):
         # Physics
         self.max_speed = max_speed
         self.accel = accel
@@ -31,13 +32,37 @@ class Machine:
         self.edge_color = edge_color
         self.canopy_color = canopy_color
 
-    def draw(self, screen, center, lean):
-        hull_pts = [center + p.rotate_rad(lean) for p in self.hull_points]
-        canopy_pts = [center + p.rotate_rad(lean) for p in self.canopy_points]
+        # Sprite logic
+        self.sprite_path = sprite_path
+        self.sprite_scale = sprite_scale
+        self.sprite = None
 
-        pg.draw.polygon(screen, self.hull_color, hull_pts)
-        pg.draw.polygon(screen, self.edge_color, hull_pts, width=2)
-        pg.draw.polygon(screen, self.canopy_color, canopy_pts)
+    def load_assets(self):
+        if self.sprite_path and self.sprite is None:
+            try:
+                self.sprite = pg.image.load(self.sprite_path).convert_alpha()
+                if self.sprite_scale != 1.0:
+                    new_size = (int(self.sprite.get_width() * self.sprite_scale), 
+                                int(self.sprite.get_height() * self.sprite_scale))
+                    self.sprite = pg.transform.scale(self.sprite, new_size)
+            except Exception as e:
+                print(f"Error loading sprite {self.sprite_path}: {e}")
+
+    def draw(self, screen, center, lean):
+        if self.sprite:
+            # Rotate sprite based on lean (lean is in radians, rotozoom takes degrees)
+            angle = -lean * 57.2958 # rad to deg
+            # Use rotozoom for better quality rotation
+            rotated_sprite = pg.transform.rotozoom(self.sprite, angle, 1.0)
+            rect = rotated_sprite.get_rect(center=center)
+            screen.blit(rotated_sprite, rect)
+        else:
+            hull_pts = [center + p.rotate_rad(lean) for p in self.hull_points]
+            canopy_pts = [center + p.rotate_rad(lean) for p in self.canopy_points]
+
+            pg.draw.polygon(screen, self.hull_color, hull_pts)
+            pg.draw.polygon(screen, self.edge_color, hull_pts, width=2)
+            pg.draw.polygon(screen, self.canopy_color, canopy_pts)
 
 
 # Instance with current settings
@@ -58,5 +83,7 @@ DOPAMINE_FALCON = Machine(
     canopy_points=[(0, -30), (10, 4), (-10, 4)],
     hull_color=(60, 180, 255),
     edge_color=(15, 35, 80),
-    canopy_color=(255, 255, 255)
+    canopy_color=(255, 255, 255),
+    sprite_path='textures/machines/dopamine-rear-1.png',
+    sprite_scale=1.0
 )
