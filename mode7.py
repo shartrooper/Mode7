@@ -288,4 +288,3 @@ class Mode7:
                 screen_array[i, j] = floor_col
 
         return screen_array
-
