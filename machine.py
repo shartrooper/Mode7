@@ -84,6 +84,7 @@ class Machine:
             # Rotate sprite based on tilt_angle (from shifting weights)
             # tilt_angle is in radians, rotozoom takes degrees
             angle_deg = -tilt_angle * 57.2958 
+            
             rotated_sprite = pg.transform.rotozoom(sprite, angle_deg, 1.0)
             rect = rotated_sprite.get_rect(center=center)
             screen.blit(rotated_sprite, rect)

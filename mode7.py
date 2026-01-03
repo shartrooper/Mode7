@@ -21,6 +21,7 @@ class Player:
         self.pitch = 0  # -1: Nose Down, 0: Level, 1: Nose Up
         self.jump_timer = 0.0
         self.steer_lean = 0.0  # Animation state: -2 (Right) to 2 (Left)
+        self.visual_tilt = 0.0  # Snappy visual tilt state
 
     def update(self, dt):
         keys = pg.key.get_pressed()
@@ -109,9 +110,9 @@ class Player:
         shift_right = keys[pg.K_e]
         shift_input = 0
         if shift_left and not shift_right:
-            shift_input = 1
-        elif shift_right and not shift_left:
             shift_input = -1
+        elif shift_right and not shift_left:
+            shift_input = 1
 
         shift_active = abs(self.speed) > self.machine.shift_min
         if shift_input and shift_active:
@@ -122,6 +123,15 @@ class Player:
             self.shift_force = max(0.0, self.shift_force - self.machine.shift_decay * dt)
             if self.shift_force == 0 or not shift_active:
                 self.shift_dir = 0
+
+        # Visual Tilt Animation (Snappy)
+        target_tilt = shift_input
+
+        tilt_speed = 0.8 * dt
+        if self.visual_tilt < target_tilt:
+            self.visual_tilt = min(self.visual_tilt + tilt_speed, target_tilt)
+        elif self.visual_tilt > target_tilt:
+            self.visual_tilt = max(self.visual_tilt - tilt_speed, target_tilt)
 
         self.pos[0] += cos_a * self.speed * dt
         self.pos[1] += sin_a * self.speed * dt
@@ -239,8 +249,10 @@ class Mode7:
         center.y -= (self.player.z * 1500) + shudder_y
         center.x += shudder_x
         
-        # Tilt angle from shifting weights (Q/E)
-        tilt_angle = self.player.shift_dir * self.player.shift_force * 2.0
+        # Tilt angle from snappy visual state
+        # Multiplying by 0.25 (since target_tilt is 1 or -1)
+        # 1.0 * 0.25 rad = 0.25 rad (approx 14 degrees)
+        tilt_angle = self.player.visual_tilt * 0.25
         
         self.player.machine.draw(self.app.screen, center, self.player.steer_lean, tilt_angle)
 
