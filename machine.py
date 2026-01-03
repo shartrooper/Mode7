@@ -55,12 +55,15 @@ class Machine:
                 self.load_one('textures/machines/rear-view-left-1.png'),
                 self.load_one('textures/machines/rear-view-left-2.png')
             ],
-            'right': [] # Placeholder for future sprites
+            'right': [
+                self.load_one('textures/machines/rear-view-right-1.png'),
+                self.load_one('textures/machines/rear-view-right-2.png')
+            ]
         }
 
     def draw(self, screen, center, steer_lean, tilt_angle):
         # Select sprite based on steer_lean
-        # steer_lean: 0 (Neutral) to 2 (Max Left)
+        # steer_lean: 2 (Max Left) to -2 (Max Right)
         idx = int(abs(steer_lean))
         
         sprite = None
@@ -69,7 +72,11 @@ class Machine:
                 sprite = self.sprites['left'][idx-1]
             else:
                 sprite = self.sprites['neutral'][0]
-        # Future: handle steer_lean < -0.1 for Right
+        elif steer_lean < -0.1: # Steering Right
+            if idx > 0 and idx <= len(self.sprites['right']):
+                sprite = self.sprites['right'][idx-1]
+            else:
+                sprite = self.sprites['neutral'][0]
         else:
             sprite = self.sprites['neutral'][0]
 

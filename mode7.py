@@ -20,7 +20,7 @@ class Player:
         self.vz = 0.0
         self.pitch = 0  # -1: Nose Down, 0: Level, 1: Nose Up
         self.jump_timer = 0.0
-        self.steer_lean = 0.0  # Animation state: 0 (Neutral) to 2 (Max Left)
+        self.steer_lean = 0.0  # Animation state: -2 (Right) to 2 (Left)
 
     def update(self, dt):
         keys = pg.key.get_pressed()
@@ -82,7 +82,8 @@ class Player:
         target_lean = 0.0
         if keys[pg.K_LEFT]:
             target_lean = 2.0
-        # Right ignored for now (no sprites)
+        elif keys[pg.K_RIGHT]:
+            target_lean = -2.0
         
         anim_speed = 0.15 * dt
         if self.steer_lean < target_lean:
