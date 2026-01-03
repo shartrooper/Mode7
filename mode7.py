@@ -20,6 +20,7 @@ class Player:
         self.vz = 0.0
         self.pitch = 0  # -1: Nose Down, 0: Level, 1: Nose Up
         self.jump_timer = 0.0
+        self.steer_lean = 0.0  # Animation state: 0 (Neutral) to 2 (Max Left)
 
     def update(self, dt):
         keys = pg.key.get_pressed()
@@ -76,6 +77,18 @@ class Player:
 
             if self.z <= 0:
                 self.handle_landing()
+
+        # Steer Lean Animation State
+        target_lean = 0.0
+        if keys[pg.K_LEFT]:
+            target_lean = 2.0
+        # Right ignored for now (no sprites)
+        
+        anim_speed = 0.15 * dt
+        if self.steer_lean < target_lean:
+            self.steer_lean = min(self.steer_lean + anim_speed, target_lean)
+        elif self.steer_lean > target_lean:
+            self.steer_lean = max(self.steer_lean - anim_speed, target_lean)
 
         turn_dir = 0.0
         if keys[pg.K_LEFT]:
@@ -225,8 +238,10 @@ class Mode7:
         center.y -= (self.player.z * 1500) + shudder_y
         center.x += shudder_x
         
-        lean = self.player.turn_input * 0.3
-        self.player.machine.draw(self.app.screen, center, lean)
+        # Tilt angle from shifting weights (Q/E)
+        tilt_angle = self.player.shift_dir * self.player.shift_force * 2.0
+        
+        self.player.machine.draw(self.app.screen, center, self.player.steer_lean, tilt_angle)
 
     def draw_hud(self):
         if not self.hud_font:

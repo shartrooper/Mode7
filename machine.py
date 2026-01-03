@@ -33,32 +33,57 @@ class Machine:
         self.canopy_color = canopy_color
 
         # Sprite logic
-        self.sprite_path = sprite_path
         self.sprite_scale = sprite_scale
-        self.sprite = None
+        self.sprites = {}
+
+    def load_one(self, path):
+        try:
+            img = pg.image.load(path).convert_alpha()
+            if self.sprite_scale != 1.0:
+                new_size = (int(img.get_width() * self.sprite_scale), 
+                            int(img.get_height() * self.sprite_scale))
+                img = pg.transform.scale(img, new_size)
+            return img
+        except Exception as e:
+            print(f"Error loading {path}: {e}")
+            return None
 
     def load_assets(self):
-        if self.sprite_path and self.sprite is None:
-            try:
-                self.sprite = pg.image.load(self.sprite_path).convert_alpha()
-                if self.sprite_scale != 1.0:
-                    new_size = (int(self.sprite.get_width() * self.sprite_scale), 
-                                int(self.sprite.get_height() * self.sprite_scale))
-                    self.sprite = pg.transform.scale(self.sprite, new_size)
-            except Exception as e:
-                print(f"Error loading sprite {self.sprite_path}: {e}")
+        self.sprites = {
+            'neutral': [self.load_one('textures/machines/rear-view.png')],
+            'left': [
+                self.load_one('textures/machines/rear-view-left-1.png'),
+                self.load_one('textures/machines/rear-view-left-2.png')
+            ],
+            'right': [] # Placeholder for future sprites
+        }
 
-    def draw(self, screen, center, lean):
-        if self.sprite:
-            # Rotate sprite based on lean (lean is in radians, rotozoom takes degrees)
-            angle = -lean * 57.2958 # rad to deg
-            # Use rotozoom for better quality rotation
-            rotated_sprite = pg.transform.rotozoom(self.sprite, angle, 1.0)
+    def draw(self, screen, center, steer_lean, tilt_angle):
+        # Select sprite based on steer_lean
+        # steer_lean: 0 (Neutral) to 2 (Max Left)
+        idx = int(abs(steer_lean))
+        
+        sprite = None
+        if steer_lean > 0.1: # Steering Left
+            if idx > 0 and idx <= len(self.sprites['left']):
+                sprite = self.sprites['left'][idx-1]
+            else:
+                sprite = self.sprites['neutral'][0]
+        # Future: handle steer_lean < -0.1 for Right
+        else:
+            sprite = self.sprites['neutral'][0]
+
+        if sprite:
+            # Rotate sprite based on tilt_angle (from shifting weights)
+            # tilt_angle is in radians, rotozoom takes degrees
+            angle_deg = -tilt_angle * 57.2958 
+            rotated_sprite = pg.transform.rotozoom(sprite, angle_deg, 1.0)
             rect = rotated_sprite.get_rect(center=center)
             screen.blit(rotated_sprite, rect)
         else:
-            hull_pts = [center + p.rotate_rad(lean) for p in self.hull_points]
-            canopy_pts = [center + p.rotate_rad(lean) for p in self.canopy_points]
+            # Fallback to polygon drawing using tilt_angle
+            hull_pts = [center + p.rotate_rad(tilt_angle) for p in self.hull_points]
+            canopy_pts = [center + p.rotate_rad(tilt_angle) for p in self.canopy_points]
 
             pg.draw.polygon(screen, self.hull_color, hull_pts)
             pg.draw.polygon(screen, self.edge_color, hull_pts, width=2)
@@ -84,6 +109,5 @@ DOPAMINE_FALCON = Machine(
     hull_color=(60, 180, 255),
     edge_color=(15, 35, 80),
     canopy_color=(255, 255, 255),
-    sprite_path='textures/machines/dopamine-rear-1.png',
     sprite_scale=1.0
 )
