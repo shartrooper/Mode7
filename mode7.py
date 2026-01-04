@@ -254,7 +254,10 @@ class Mode7:
         # 1.0 * 0.25 rad = 0.25 rad (approx 14 degrees)
         tilt_angle = self.player.visual_tilt * 0.25
         
-        self.player.machine.draw(self.app.screen, center, self.player.steer_lean, tilt_angle, self.player.pitch, self.player.z)
+        keys = pg.key.get_pressed()
+        accelerating = keys[pg.K_SPACE]
+        
+        self.player.machine.draw(self.app.screen, center, self.player.steer_lean, tilt_angle, self.player.pitch, self.player.z, accelerating)
 
     def draw_hud(self):
         if not self.hud_font:
