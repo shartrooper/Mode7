@@ -58,27 +58,30 @@ class Machine:
             'right': [
                 self.load_one('textures/machines/rear-view-right-1.png'),
                 self.load_one('textures/machines/rear-view-right-2.png')
-            ]
+            ],
+            'jump': self.load_one('textures/machines/rear-view-jump.png')
         }
 
-    def draw(self, screen, center, steer_lean, tilt_angle):
-        # Select sprite based on steer_lean
-        # steer_lean: 2 (Max Left) to -2 (Max Right)
-        idx = int(abs(steer_lean))
-        
-        sprite = None
-        if steer_lean > 0.1: # Steering Left
-            if idx > 0 and idx <= len(self.sprites['left']):
-                sprite = self.sprites['left'][idx-1]
-            else:
-                sprite = self.sprites['neutral'][0]
-        elif steer_lean < -0.1: # Steering Right
-            if idx > 0 and idx <= len(self.sprites['right']):
-                sprite = self.sprites['right'][idx-1]
-            else:
-                sprite = self.sprites['neutral'][0]
+    def draw(self, screen, center, steer_lean, tilt_angle, pitch=0, z=0):
+        # Select sprite based on state
+        # Priority 1: Jump/Pitch Up (Glide)
+        if z > 0 and pitch == -1:
+            sprite = self.sprites['jump']
         else:
-            sprite = self.sprites['neutral'][0]
+            # Priority 2: Steering Animation
+            idx = int(abs(steer_lean))
+            if steer_lean > 0.1: # Steering Left
+                if idx > 0 and idx <= len(self.sprites['left']):
+                    sprite = self.sprites['left'][idx-1]
+                else:
+                    sprite = self.sprites['neutral'][0]
+            elif steer_lean < -0.1: # Steering Right
+                if idx > 0 and idx <= len(self.sprites['right']):
+                    sprite = self.sprites['right'][idx-1]
+                else:
+                    sprite = self.sprites['neutral'][0]
+            else:
+                sprite = self.sprites['neutral'][0]
 
         if sprite:
             # Rotate sprite based on tilt_angle (from shifting weights)
