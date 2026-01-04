@@ -38,19 +38,31 @@ class Machine:
         
         # Thruster Glow Config (Relative to 180x100 PNG center)
         self.thruster_offsets = {
-            'neutral': [
-                pg.Vector2(55.5 - 90, 54 - 50),
-                pg.Vector2(51.7 - 90, 72.5 - 50),
-                pg.Vector2(124 - 90, 54 - 50),
-                pg.Vector2(128.5 - 90, 72.5 - 50)
-            ],
-            'jump': [
-                pg.Vector2(55.5 - 90, 58.4 - 50),
-                pg.Vector2(51.6 - 90, 77.1 - 50),
-                pg.Vector2(124.1 - 90, 58 - 50),
-                pg.Vector2(128 - 90, 77 - 50)
-            ],
-            # Left/Right to be filled as user provides coordinates
+            'neutral': {
+                'circles': [
+                    pg.Vector2(55.5 - 90, 54 - 50),
+                    pg.Vector2(51.7 - 90, 72.5 - 50),
+                    pg.Vector2(124 - 90, 54 - 50),
+                    pg.Vector2(128.5 - 90, 72.5 - 50)
+                ],
+                'triangles': [
+                    [pg.Vector2(35.5 - 90, 30.5 - 50), pg.Vector2(27.6 - 90, 37 - 50), pg.Vector2(43.7 - 90, 37 - 50)],
+                    [pg.Vector2(144.4 - 90, 30.5 - 50), pg.Vector2(136 - 90, 37 - 50), pg.Vector2(152.4 - 90, 37 - 50)]
+                ]
+            },
+            'jump': {
+                'circles': [
+                    pg.Vector2(55.5 - 90, 58.4 - 50),
+                    pg.Vector2(51.6 - 90, 77.1 - 50),
+                    pg.Vector2(124.1 - 90, 58 - 50),
+                    pg.Vector2(128 - 90, 77 - 50)
+                ],
+                'triangles': [
+                    # Defaulting to neutral for jump unless specified later
+                    [pg.Vector2(35.5 - 90, 30.5 - 50), pg.Vector2(27.6 - 90, 37 - 50), pg.Vector2(43.7 - 90, 37 - 50)],
+                    [pg.Vector2(144.4 - 90, 30.5 - 50), pg.Vector2(136 - 90, 37 - 50), pg.Vector2(152.4 - 90, 37 - 50)]
+                ]
+            }
         }
 
     def load_one(self, path):
@@ -123,34 +135,48 @@ class Machine:
 
     def draw_thrusters(self, screen, center, tilt_angle, state_key):
         # Use neutral offsets if specific state offsets aren't defined yet
-        # (Handling 'left-1', 'left-2', etc. gracefully)
         lookup_key = state_key if state_key in self.thruster_offsets else 'neutral'
-        offsets = self.thruster_offsets[lookup_key]
+        data = self.thruster_offsets[lookup_key]
         
         # Flicker logic
         ticks = pg.time.get_ticks()
         flicker = (ticks // 60) % 2 == 0
-        core_col = (255, 255, 100) if flicker else (255, 150, 0) # Yellow vs Orange
-        glow_col = (200, 50, 0) # Red glow
+        core_col = (255, 255, 100) if flicker else (255, 150, 0)
+        glow_col = (200, 50, 0)
         
-        # Ellipse dimensions from user: rx=8, ry=6
+        # 1. Draw Circles (Lower Thrusters)
         rx, ry = 8, 6
-        
-        for offset in offsets:
-            # Rotate offset to match ship tilt
+        for offset in data['circles']:
             rotated_offset = offset.rotate_rad(tilt_angle)
             pos = center + rotated_offset
             
-            # Draw outer glow (slightly larger)
-            # Create a small temporary surface for the glow to apply special_flags
-            glow_surf = pg.Surface(((rx + 4) * 2, (ry + 3) * 2), pg.SRCALPHA)
-            pg.draw.ellipse(glow_surf, glow_col, (0, 0, (rx + 4) * 2, (ry + 3) * 2))
-            screen.blit(glow_surf, (pos.x - (rx + 4), pos.y - (ry + 3)), special_flags=pg.BLEND_ADD)
+            glow_surf = pg.Surface(((rx + 2) * 2, (ry + 2) * 2), pg.SRCALPHA)
+            pg.draw.ellipse(glow_surf, glow_col, (0, 0, (rx + 2) * 2, (ry + 2) * 2))
+            screen.blit(glow_surf, (pos.x - (rx + 2), pos.y - (ry + 2)), special_flags=pg.BLEND_ADD)
+            pg.draw.ellipse(screen, core_col, pg.Rect(pos.x - rx, pos.y - ry, rx * 2, ry * 2))
+
+        # 2. Draw Triangles (Upper Thrusters)
+        for tri_offsets in data['triangles']:
+            # Calculate bounding box for the temporary surface
+            transformed = [off.rotate_rad(tilt_angle) for off in tri_offsets]
+            xs = [p.x for p in transformed]
+            ys = [p.y for p in transformed]
+            min_x, max_x = min(xs) - 5, max(xs) + 5
+            min_y, max_y = min(ys) - 5, max(ys) + 5
+            width, height = int(max_x - min_x), int(max_y - min_y)
             
-            # Draw hot core
-            core_rect = pg.Rect(0, 0, rx * 2, ry * 2)
-            core_rect.center = pos
-            pg.draw.ellipse(screen, core_col, core_rect)
+            glow_surf = pg.Surface((width, height), pg.SRCALPHA)
+            local_pts = [(p.x - min_x, p.y - min_y) for p in transformed]
+            
+            # Thick lines for rounded glow
+            pg.draw.lines(glow_surf, glow_col, True, local_pts, width=4)
+            screen.blit(glow_surf, (center.x + min_x, center.y + min_y), special_flags=pg.BLEND_ADD)
+            
+            # Hot core
+            final_pts = [center + p for p in transformed]
+            pg.draw.polygon(screen, core_col, final_pts)
+
+
 
 
 
