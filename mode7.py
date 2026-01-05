@@ -236,7 +236,6 @@ class Mode7:
 
     def draw_vehicle(self):
         center = pg.Vector2(HALF_WIDTH, int(HEIGHT * 0.75))
-        
         # Engine Shudder based on speed ratio
         speed_ratio = self.player.speed / self.player.machine.max_speed
         shudder_x, shudder_y = 0, 0
@@ -248,6 +247,15 @@ class Mode7:
         # Visual altitude offset and engine shudder
         center.y -= (self.player.z * 1500) + shudder_y
         center.x += shudder_x
+        
+        # Ground shadow
+        shadow_scale = max(0.4, 1.0 - (self.player.z * 2.0))  # shrink as we rise, clamp
+        shadow_width = int(145 * shadow_scale)
+        shadow_height = int(65 * shadow_scale)
+        shadow_surf = pg.Surface((shadow_width, shadow_height), pg.SRCALPHA)
+        pg.draw.ellipse(shadow_surf, (0, 0, 0, 80), shadow_surf.get_rect())
+        shadow_rect = shadow_surf.get_rect(center=(center.x, center.y + shadow_height // 2))
+        self.app.screen.blit(shadow_surf, shadow_rect)
         
         # Tilt angle from snappy visual state
         # Multiplying by 0.25 (since target_tilt is 1 or -1)
