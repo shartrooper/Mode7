@@ -235,7 +235,8 @@ class Mode7:
         self.draw_hud()
 
     def draw_vehicle(self):
-        center = pg.Vector2(HALF_WIDTH, int(HEIGHT * 0.75))
+        ground_y = int(HEIGHT * 0.75)
+        
         # Engine Shudder based on speed ratio
         speed_ratio = self.player.speed / self.player.machine.max_speed
         shudder_x, shudder_y = 0, 0
@@ -244,18 +245,18 @@ class Mode7:
             shudder_x = np.random.uniform(-intensity, intensity)
             shudder_y = np.random.uniform(-intensity, intensity)
 
-        # Visual altitude offset and engine shudder
-        center.y -= (self.player.z * 1500) + shudder_y
-        center.x += shudder_x
-        
-        # Ground shadow
-        shadow_scale = max(0.4, 1.0 - (self.player.z * 2.0))  # shrink as we rise, clamp
+        # Ground shadow (stays at ground_y)
+        shadow_scale = max(0.4, 1.0 - (self.player.z * 2.0))
         shadow_width = int(145 * shadow_scale)
         shadow_height = int(65 * shadow_scale)
         shadow_surf = pg.Surface((shadow_width, shadow_height), pg.SRCALPHA)
         pg.draw.ellipse(shadow_surf, (0, 0, 0, 80), shadow_surf.get_rect())
-        shadow_rect = shadow_surf.get_rect(center=(center.x, center.y + shadow_height // 2))
+        # Shadow follows ship's X (with shudder) but stays at ground Y
+        shadow_rect = shadow_surf.get_rect(center=(HALF_WIDTH + shudder_x, ground_y + 20))
         self.app.screen.blit(shadow_surf, shadow_rect)
+
+        # Ship center (incorporates altitude and shudder)
+        ship_center = pg.Vector2(HALF_WIDTH + shudder_x, ground_y - (self.player.z * 1500) - shudder_y)
         
         # Tilt angle from snappy visual state
         # Multiplying by 0.25 (since target_tilt is 1 or -1)
@@ -265,7 +266,7 @@ class Mode7:
         keys = pg.key.get_pressed()
         accelerating = keys[pg.K_SPACE]
         
-        self.player.machine.draw(self.app.screen, center, self.player.steer_lean, tilt_angle, self.player.pitch, self.player.z, accelerating)
+        self.player.machine.draw(self.app.screen, ship_center, self.player.steer_lean, tilt_angle, self.player.pitch, self.player.z, accelerating)
 
     def draw_hud(self):
         if not self.hud_font:
