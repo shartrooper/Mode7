@@ -62,6 +62,54 @@ class Machine:
                     [pg.Vector2(35.5 - 90, 30.5 - 50), pg.Vector2(27.6 - 90, 37 - 50), pg.Vector2(43.7 - 90, 37 - 50)],
                     [pg.Vector2(144.4 - 90, 30.5 - 50), pg.Vector2(136 - 90, 37 - 50), pg.Vector2(152.4 - 90, 37 - 50)]
                 ]
+            },
+            'right-1': {
+                'circles': [
+                    pg.Vector2(55.5 - 90, 54 - 50),
+                    pg.Vector2(51.7 - 90, 72.5 - 50),
+                    pg.Vector2(124 - 90, 54 - 50),
+                    pg.Vector2(128.5 - 90, 72.5 - 50)
+                ],
+                'triangles': [
+                    [pg.Vector2(30.2 - 90, 36 - 50), pg.Vector2(36 - 90, 30 - 50), pg.Vector2(44 - 90, 36 - 50)],
+                    [pg.Vector2(140.4 - 90, 30 - 50), pg.Vector2(134 - 90, 36 - 50), pg.Vector2(148 - 90, 36 - 50)]
+                ]
+            },
+            'right-2': {
+                'circles': [
+                    pg.Vector2(55.5 - 90, 54 - 50),
+                    pg.Vector2(51.7 - 90, 72.5 - 50),
+                    pg.Vector2(124 - 90, 54 - 50),
+                    pg.Vector2(128.5 - 90, 72.5 - 50)
+                ],
+                'triangles': [
+                    [pg.Vector2(24.5 - 90, 36 - 50), pg.Vector2(36 - 90, 36 - 50), pg.Vector2(27.6 - 90, 29 - 50)],
+                    [pg.Vector2(132 - 90, 29 - 50), pg.Vector2(128 - 90, 36 - 50), pg.Vector2(140 - 90, 36 - 50)]
+                ]
+            },
+            'left-1': {
+                'circles': [
+                    pg.Vector2(55.5 - 90, 54 - 50),
+                    pg.Vector2(51.7 - 90, 72.5 - 50),
+                    pg.Vector2(124 - 90, 54 - 50),
+                    pg.Vector2(128.5 - 90, 72.5 - 50)
+                ],
+                'triangles': [
+                    [pg.Vector2(32 - 90, 36 - 50), pg.Vector2(40 - 90, 30 - 50), pg.Vector2(46 - 90, 36 - 50)],
+                    [pg.Vector2(144 - 90, 30 - 50), pg.Vector2(136 - 90, 36 - 50), pg.Vector2(150 - 90, 36 - 50)]
+                ]
+            },
+            'left-2': {
+                'circles': [
+                    pg.Vector2(55.5 - 90, 54 - 50),
+                    pg.Vector2(51.7 - 90, 72.5 - 50),
+                    pg.Vector2(124 - 90, 54 - 50),
+                    pg.Vector2(128.5 - 90, 72.5 - 50)
+                ],
+                'triangles': [
+                    [pg.Vector2(46 - 90, 30 - 50), pg.Vector2(38 - 90, 37 - 50), pg.Vector2(50 - 90, 36.5 - 50)],
+                    [pg.Vector2(150 - 90, 30 - 50), pg.Vector2(142.5 - 90, 37 - 50), pg.Vector2(153 - 90, 36.5 - 50)]
+                ]
             }
         }
 
