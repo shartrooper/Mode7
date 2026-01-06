@@ -139,12 +139,16 @@ class Machine:
             'jump': self.load_one('textures/machines/rear-view-jump.png')
         }
 
-    def draw(self, screen, center, steer_lean, tilt_angle, pitch=0, z=0, accelerating=False):
+    def draw(self, screen, center, steer_lean, tilt_angle, pitch=0, z=0, accelerating=False, braking=False):
         # Select sprite based on state
         state_key = 'neutral'
         sprite = None
         
-        if z > 0 and pitch == -1:
+        # Override for braking: force neutral sprite and no thrusters
+        if braking:
+            sprite = self.sprites['neutral'][0]
+            state_key = 'neutral'
+        elif z > 0 and pitch == -1:
             sprite = self.sprites['jump']
             state_key = 'jump'
         else:
@@ -170,8 +174,8 @@ class Machine:
             rect = rotated_sprite.get_rect(center=center)
             screen.blit(rotated_sprite, rect)
             
-            # Draw Thruster Combustion
-            if accelerating:
+            # Draw Thruster Combustion (only if NOT braking)
+            if accelerating and not braking:
                 self.draw_thrusters(screen, center, tilt_angle, state_key)
         else:
             # Fallback to...
@@ -232,7 +236,7 @@ class Machine:
 DOPAMINE_FALCON = Machine(
     max_speed=0.12,
     accel=0.0005,
-    brake=0.01,
+    brake=0.003,
     friction=0.0008,
     steer_speed=0.015,
     shift_max=0.15,

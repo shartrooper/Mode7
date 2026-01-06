@@ -265,8 +265,9 @@ class Mode7:
         
         keys = pg.key.get_pressed()
         accelerating = keys[pg.K_SPACE]
+        braking = keys[pg.K_s]
         
-        self.player.machine.draw(self.app.screen, ship_center, self.player.steer_lean, tilt_angle, self.player.pitch, self.player.z, accelerating)
+        self.player.machine.draw(self.app.screen, ship_center, self.player.steer_lean, tilt_angle, self.player.pitch, self.player.z, accelerating, braking)
 
     def draw_hud(self):
         if not self.hud_font:
