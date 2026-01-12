@@ -178,12 +178,12 @@ class JumpPad:
 class Mode7:
     def __init__(self, app):
         self.app = app
-        self.floor_tex = pg.image.load('textures/track_4.png').convert()
+        self.floor_tex = pg.image.load('textures/mess_room_circuit.png').convert()
         self.tex_size = self.floor_tex.get_size()
         self.floor_array = pg.surfarray.array3d(self.floor_tex)
 
-        self.ceil_tex = pg.image.load('textures/ceil_2.png').convert()
-        self.ceil_tex = pg.transform.scale(self.ceil_tex, self.tex_size)
+        self.ceil_tex = pg.image.load('textures/ceil_pr.png').convert()
+        self.ceil_size = self.ceil_tex.get_size()
         self.ceil_array = pg.surfarray.array3d(self.ceil_tex)
 
         self.screen_array = pg.surfarray.array3d(pg.Surface(WIN_RES))
@@ -226,7 +226,7 @@ class Mode7:
         cam_pos = self.player.pos + cam_offset
 
         self.screen_array = self.render_frame(self.floor_array, self.ceil_array, self.screen_array,
-                                              self.tex_size, self.player.angle, cam_pos, 
+                                              self.tex_size, self.ceil_size, self.player.angle, cam_pos, 
                                               self.alt + (self.player.z * 0.1), dynamic_focal_len + shake)
 
     def draw(self):
@@ -294,14 +294,20 @@ class Mode7:
 
     @staticmethod
     @njit(fastmath=True, parallel=True)
-    def render_frame(floor_array, ceil_array, screen_array, tex_size, angle, player_pos, alt, focal_len):
+    def render_frame(floor_array, ceil_array, screen_array, tex_size, ceil_size, angle, player_pos, alt, focal_len):
 
         sin, cos = np.sin(angle), np.cos(angle)
 
         for i in prange(WIDTH):
-            # ceiling / background up to horizon
+            # ceiling / background (Panoramic Scroll)
+            # Map screen width to a fraction of the panorama
+            # Adjust the multiplier (0.2) to control how much of the sky is visible at once
+            panorama_x = (i / WIDTH * 0.2 + angle / (2 * np.pi)) % 1.0
+            tex_x = int(panorama_x * ceil_size[0])
+            
             for j in range(0, STD_HORIZON):
-                screen_array[i][j] = ceil_array[(i - int(angle * BACKGROUND_ROTATION_SPEED)) % tex_size[0]][j % tex_size[1]]
+                tex_y = int((j / STD_HORIZON) * ceil_size[1])
+                screen_array[i][j] = ceil_array[tex_x][tex_y]
 
             # floor render from horizon to bottom
             for j in range(STD_HORIZON, HEIGHT):
