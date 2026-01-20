@@ -178,13 +178,18 @@ class JumpPad:
 class Mode7:
     def __init__(self, app):
         self.app = app
-        self.floor_tex = pg.image.load('textures/mess_room_circuit.png').convert()
+        self.floor_tex = pg.image.load('textures/mess_room/circuit.png').convert()
         self.tex_size = self.floor_tex.get_size()
         self.floor_array = pg.surfarray.array3d(self.floor_tex)
 
-        self.ceil_tex = pg.image.load('textures/ceil_pr.png').convert()
+        self.ceil_tex = pg.image.load('textures/mess_room/pano.png').convert()
         self.ceil_size = self.ceil_tex.get_size()
         self.ceil_array = pg.surfarray.array3d(self.ceil_tex)
+
+        self.logic_tex = pg.image.load('textures/mess_room/logic.png').convert_alpha()
+        self.logic_size = self.logic_tex.get_size()
+        self.logic_rgb = pg.surfarray.array3d(self.logic_tex)
+        self.logic_alpha = pg.surfarray.array_alpha(self.logic_tex)
 
         self.screen_array = pg.surfarray.array3d(pg.Surface(WIN_RES))
 
@@ -193,11 +198,6 @@ class Mode7:
         self.alt = CAM_ALT
         self.cam_distance = CAM_DISTANCE
 
-        # Jump Pads (World coordinates = Texture coordinates / SCALE)
-        self.jump_pads = [
-            JumpPad(pos=(960 / SCALE, 632 / SCALE), size=(35 / SCALE, 32 / SCALE)) 
-        ]
-
         pg.font.init()
         try:
             self.hud_font = pg.font.SysFont('Consolas', 26)
@@ -205,6 +205,7 @@ class Mode7:
             self.hud_font = None
 
     def update(self, dt):
+        prev_pos = self.player.pos.copy()
         self.player.update(dt)
         
         # Dynamic FOV: focal length decreases as speed increases
@@ -215,9 +216,10 @@ class Mode7:
         if speed_ratio > 0.8:
             shake = np.random.uniform(-1, 1) * (speed_ratio - 0.8) * 5
 
-        # Check Jump Pad triggers
-        for pad in self.jump_pads:
-            pad.check_trigger(self.player)
+        # Wall collision (ground only)
+        if self.player.z <= 0 and self.is_wall(self.player.pos):
+            self.player.pos = prev_pos
+            self.player.speed = 0
 
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
@@ -291,6 +293,15 @@ class Mode7:
         self.app.screen.blit(pitch_text, (20, 80))
         self.app.screen.blit(pos_text, (20, 110))
         self.app.screen.blit(info_text, (20, 140))
+
+    def is_wall(self, world_pos):
+        # Sample logic map using world position (texture space)
+        px = int(world_pos[1] * SCALE) % self.logic_size[0]
+        py = int(world_pos[0] * SCALE) % self.logic_size[1]
+        if self.logic_alpha[px][py] == 0:
+            return False
+        r, g, b = self.logic_rgb[px][py]
+        return r < 10 and g < 10 and b < 10
 
     @staticmethod
     @njit(fastmath=True, parallel=True)
