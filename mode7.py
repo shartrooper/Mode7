@@ -1,6 +1,7 @@
 import pygame as pg
 import numpy as np
 from settings import *
+from settings_debug import DEBUG_UI, REMOVE_WALL_COLLISION
 from machine import DOPAMINE_FALCON
 from numba import njit, prange
 
@@ -217,9 +218,12 @@ class Mode7:
             shake = np.random.uniform(-1, 1) * (speed_ratio - 0.8) * 5
 
         # Wall collision (ground only)
-        if self.player.z <= 0 and self.is_wall(self.player.pos):
-            self.player.pos = prev_pos
-            self.player.speed = 0
+        # Use projected sampling to align collision with visual ship position
+        if self.player.z <= 0:
+            projected_pos = self.get_projected_world_pos(dynamic_focal_len + shake)
+            if self.is_wall(projected_pos):
+                self.player.pos = prev_pos
+                self.player.speed = 0
 
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
@@ -230,6 +234,48 @@ class Mode7:
         self.screen_array = self.render_frame(self.floor_array, self.ceil_array, self.screen_array,
                                               self.tex_size, self.ceil_size, self.player.angle, cam_pos, 
                                               self.alt + (self.player.z * 0.1), dynamic_focal_len + shake)
+
+    def get_projected_world_pos(self, focal_len):
+        """
+        Calculates the world position that corresponds to the screen pixel 
+        where the ship is visually rendered.
+        """
+        # Ship is rendered at HALF_WIDTH and roughly ground_y
+        # From draw_vehicle: ground_y = int(HEIGHT * 0.75)
+        # We need to match the render_frame logic for screen pixel (i, j)
+        i = HALF_WIDTH
+        j = int(HEIGHT * 0.75)
+        
+        # 1. Camera setup (same as render_frame)
+        angle = self.player.angle
+        sin, cos = np.sin(angle), np.cos(angle)
+        
+        # cam_pos calculation (same as update)
+        cam_offset = np.array([
+            -self.cam_distance * np.cos(angle),
+            -self.cam_distance * np.sin(angle)
+        ])
+        cam_pos = self.player.pos + cam_offset
+        
+        # 2. Invert Projection (from render_frame lines 345-355)
+        # j is the screen row, i is the screen column
+        x = HALF_WIDTH - i  # This is 0 since i = HALF_WIDTH
+        y = j + focal_len
+        z = j - STD_HORIZON + 0.01
+        
+        # Rotation
+        rx = x * cos + y * sin
+        ry = -x * sin + y * cos
+        
+        # Altitude and Scale
+        alt = self.alt + (self.player.z * 0.1)
+        px = (alt * rx / z + cam_pos[1])
+        py = (alt * ry / z + cam_pos[0])
+        
+        # Return world coordinates (unscaled, as is_wall applies SCALE)
+        # Note: render_frame uses cam_pos[1] for px and cam_pos[0] for py
+        # We return them in [y, x] order to match how is_wall uses them
+        return np.array([py, px], dtype=np.float32)
 
     def draw(self):
         pg.surfarray.blit_array(self.app.screen, self.screen_array)
@@ -293,8 +339,27 @@ class Mode7:
         self.app.screen.blit(pitch_text, (20, 80))
         self.app.screen.blit(pos_text, (20, 110))
         self.app.screen.blit(info_text, (20, 140))
+        if DEBUG_UI:
+            debug_pos = self.hud_font.render(
+                f'Pos: {self.player.pos[0]:.2f}, {self.player.pos[1]:.2f}', True, (180, 180, 180)
+            )
+            self.app.screen.blit(debug_pos, (20, 170))
+            px, py, rgb, alpha = self.sample_logic_at_player()
+            logic_text = self.hud_font.render(
+                f'Logic: {px},{py} RGB:{rgb[0]},{rgb[1]},{rgb[2]} A:{alpha}', True, (180, 180, 180)
+            )
+            self.app.screen.blit(logic_text, (20, 200))
+
+    def sample_logic_at_player(self):
+        px = int(self.player.pos[1] * SCALE) % self.logic_size[0]
+        py = int(self.player.pos[0] * SCALE) % self.logic_size[1]
+        r, g, b = self.logic_rgb[px][py]
+        a = int(self.logic_alpha[px][py])
+        return px, py, (int(r), int(g), int(b)), a
 
     def is_wall(self, world_pos):
+        if REMOVE_WALL_COLLISION:
+            return False
         # Sample logic map using world position (texture space)
         px = int(world_pos[1] * SCALE) % self.logic_size[0]
         py = int(world_pos[0] * SCALE) % self.logic_size[1]

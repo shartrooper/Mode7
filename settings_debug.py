@@ -1,0 +1,2 @@
+DEBUG_UI = True
+REMOVE_WALL_COLLISION = False
