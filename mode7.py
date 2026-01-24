@@ -23,11 +23,21 @@ class Player:
         self.jump_timer = 0.0
         self.steer_lean = 0.0  # Animation state: -2 (Right) to 2 (Left)
         self.visual_tilt = 0.0  # Snappy visual tilt state
+        
+        # Collision & Bounce state
+        self.hit_stun = 0.0  # Timer for ignoring input after a crash
 
     def update(self, dt):
         keys = pg.key.get_pressed()
-        accelerating = keys[pg.K_SPACE]
-        braking = keys[pg.K_s]
+        
+        # Update hit stun
+        if self.hit_stun > 0:
+            self.hit_stun = max(0, self.hit_stun - dt)
+            accelerating = False
+            braking = False
+        else:
+            accelerating = pg.key.get_pressed()[pg.K_SPACE]
+            braking = pg.key.get_pressed()[pg.K_s]
         
         # Immediate Pitch Control
         if keys[pg.K_UP]: self.pitch = 1
@@ -47,23 +57,33 @@ class Player:
             # If gliding (Pitch -1), drag is reduced even further to maintain momentum
             air_drag_factor = 1.5 if self.pitch == -1 else 3.0
             drag = self.speed * (self.machine.friction * air_drag_factor) * dt
-            self.speed = max(0, self.speed - drag)
+            self.speed -= drag
         else:
             # Ground speed logic: Apply acceleration and braking
             if braking:
-                self.speed = max(0, self.speed - self.machine.brake * dt)
+                # If moving forward, slow down. If moving backward (bounce), slow down towards 0.
+                if self.speed > 0:
+                    self.speed = max(0, self.speed - self.machine.brake * dt)
+                else:
+                    self.speed = min(0, self.speed + self.machine.brake * dt)
             elif accelerating:
                 self.speed += self.machine.accel * dt
             
             # ALWAYS Apply Drag (Proportional Friction)
+            # Friction should always pull speed towards zero, regardless of direction
             drag = self.speed * (self.machine.friction * 5.5) * dt
-            self.speed = max(0, self.speed - drag)
+            self.speed -= drag
             
             # Rolling Resistance: If not accelerating/braking, add a small flat speed loss
-            if not accelerating and not braking and self.speed > 0:
-                self.speed = max(0, self.speed - self.machine.friction * 0.4 * dt)
+            if not accelerating and not braking and abs(self.speed) > 0:
+                resistance = self.machine.friction * 0.4 * dt
+                if self.speed > 0:
+                    self.speed = max(0, self.speed - resistance)
+                else:
+                    self.speed = min(0, self.speed + resistance)
 
-        self.speed = np.clip(self.speed, 0, self.machine.max_speed)
+        # Clip speed to machine limits (allowing negative speed for bounces)
+        self.speed = np.clip(self.speed, -self.machine.max_speed * 0.5, self.machine.max_speed)
 
         # Vertical Physics Simulation
         if self.z > 0 or self.vz > 0:
@@ -206,7 +226,6 @@ class Mode7:
             self.hud_font = None
 
     def update(self, dt):
-        prev_pos = self.player.pos.copy()
         self.player.update(dt)
         
         # Dynamic FOV: focal length decreases as speed increases
@@ -218,12 +237,57 @@ class Mode7:
             shake = np.random.uniform(-1, 1) * (speed_ratio - 0.8) * 5
 
         # Wall collision (ground only)
-        # Use projected sampling to align collision with visual ship position
+        # Use multi-probe projected sampling for "Bumper Car" bounce effect
         if self.player.z <= 0:
-            projected_pos = self.get_projected_world_pos(dynamic_focal_len + shake)
-            if self.is_wall(projected_pos):
-                self.player.pos = prev_pos
-                self.player.speed = 0
+            center_world = self.get_projected_world_pos(dynamic_focal_len + shake)
+            
+            # Define probe offsets (adjust based on ship size and SCALE)
+            # 0.1 world units is roughly 6.4 pixels at SCALE 64
+            probe_offset = 0.08 
+            angle = self.player.angle
+            cos_a, sin_a = np.cos(angle), np.sin(angle)
+            
+            # Calculate probe positions relative to ship heading
+            # Front probe
+            f_probe = center_world + np.array([cos_a, sin_a]) * probe_offset
+            # Left/Right lateral probes
+            l_probe = center_world + np.array([-sin_a, cos_a]) * probe_offset
+            r_probe = center_world + np.array([sin_a, -cos_a]) * probe_offset
+
+            hit_wall = False
+            
+            # Lateral Hits: Push the player away from the wall (Sliding effect)
+            if self.is_wall(l_probe):
+                # Push Right
+                side_vec = np.array([sin_a, -cos_a]) 
+                push_force = (self.player.speed * 0.4 + 0.02) * dt
+                self.player.pos += side_vec * push_force
+                hit_wall = True
+            elif self.is_wall(r_probe):
+                # Push Left
+                side_vec = np.array([-sin_a, cos_a])
+                push_force = (self.player.speed * 0.4 + 0.02) * dt
+                self.player.pos += side_vec * push_force
+                hit_wall = True
+
+            # Frontal Hit: Bounce back
+            if self.is_wall(f_probe):
+                # Reverse speed with a penalty (F-Zero style bounce)
+                # We now allow negative speed in Player class
+                self.player.speed = -self.player.speed * 0.5
+                
+                # Push the player back slightly so they aren't stuck inside the wall
+                # This prevents the "vibrating against wall" effect
+                push_back_vec = np.array([cos_a, sin_a]) * 0.25
+                self.player.pos -= push_back_vec
+                
+                # Add hit stun to prevent immediate acceleration fighting the bounce
+                self.player.hit_stun = 15.0  # ~1/4 second at 60fps
+                hit_wall = True
+
+            if hit_wall:
+                # General speed penalty for any wall contact
+                self.player.speed *= 0.90
 
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
