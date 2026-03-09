@@ -26,6 +26,7 @@ class Player:
         
         # Collision & Bounce state
         self.hit_stun = 0.0  # Timer for ignoring input after a crash
+        self.on_dirt = False
 
     def update(self, dt):
         keys = pg.key.get_pressed()
@@ -60,6 +61,10 @@ class Player:
             self.speed -= drag
         else:
             # Ground speed logic: Apply acceleration and braking
+            
+            # Rough Terrain Logic
+            dirt_speed_cap = self.machine.max_speed * 0.2  # 100 km/h threshold
+            
             if braking:
                 # If moving forward, slow down. If moving backward (bounce), slow down towards 0.
                 if self.speed > 0:
@@ -73,6 +78,14 @@ class Player:
             # Friction should always pull speed towards zero, regardless of direction
             drag = self.speed * (self.machine.friction * 5.5) * dt
             self.speed -= drag
+            
+            if self.on_dirt:
+                if self.speed > dirt_speed_cap:
+                    # Softer deceleration when hitting dirt at high speeds
+                    self.speed = max(dirt_speed_cap, self.speed - (self.machine.friction * 4.0) * dt)
+                elif self.speed > 0:
+                    # Cap acceleration strictly to the dirt threshold (100)
+                    self.speed = min(self.speed, dirt_speed_cap)
             
             # Rolling Resistance: If not accelerating/braking, add a small flat speed loss
             if not accelerating and not braking and abs(self.speed) > 0:
@@ -288,6 +301,17 @@ class Mode7:
             if hit_wall:
                 # General speed penalty for any wall contact
                 self.player.speed *= 0.90
+                
+        # Terrain checking (use projected center to match visuals)
+        projected_center = self.get_projected_world_pos(dynamic_focal_len + shake)
+        px = int(projected_center[1] * SCALE) % self.logic_size[0]
+        py = int(projected_center[0] * SCALE) % self.logic_size[1]
+        r, g, b = self.logic_rgb[px][py]
+        alpha = self.logic_alpha[px][py]
+        if alpha > 0 and 120 <= r <= 135 and 45 <= g <= 55 and b < 10:
+            self.player.on_dirt = True
+        else:
+            self.player.on_dirt = False
 
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
@@ -413,6 +437,9 @@ class Mode7:
                 f'Logic: {px},{py} RGB:{rgb[0]},{rgb[1]},{rgb[2]} A:{alpha}', True, (180, 180, 180)
             )
             self.app.screen.blit(logic_text, (20, 200))
+            if self.player.on_dirt:
+                dirt_text = self.hud_font.render('ON DIRT', True, (255, 128, 0))
+                self.app.screen.blit(dirt_text, (20, 230))
 
     def sample_logic_at_player(self):
         px = int(self.player.pos[1] * SCALE) % self.logic_size[0]
