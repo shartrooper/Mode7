@@ -138,7 +138,7 @@ class Player:
         if turn_dir and self.speed:
             steer_scale = self.machine.steer_speed * (0.35 + abs(self.speed) / self.machine.max_speed)
             if self.on_ice:
-                steer_scale *= 0.25  # 75% reduction in steering grip
+                steer_scale *= 0.30  # 70% reduction in steering grip
             self.angle -= turn_dir * steer_scale * dt
 
         cos_a = np.cos(self.angle)
