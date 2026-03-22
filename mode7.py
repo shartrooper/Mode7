@@ -27,6 +27,7 @@ class Player:
         # Collision & Bounce state
         self.hit_stun = 0.0  # Timer for ignoring input after a crash
         self.on_dirt = False
+        self.on_ice = False
 
     def update(self, dt):
         keys = pg.key.get_pressed()
@@ -76,7 +77,8 @@ class Player:
             
             # ALWAYS Apply Drag (Proportional Friction)
             # Friction should always pull speed towards zero, regardless of direction
-            drag = self.speed * (self.machine.friction * 5.5) * dt
+            current_friction_mult = 3.0 if self.on_ice else 5.5
+            drag = self.speed * (self.machine.friction * current_friction_mult) * dt
             self.speed -= drag
             
             if self.on_dirt:
@@ -135,6 +137,8 @@ class Player:
 
         if turn_dir and self.speed:
             steer_scale = self.machine.steer_speed * (0.35 + abs(self.speed) / self.machine.max_speed)
+            if self.on_ice:
+                steer_scale *= 0.25  # 75% reduction in steering grip
             self.angle -= turn_dir * steer_scale * dt
 
         cos_a = np.cos(self.angle)
@@ -308,10 +312,14 @@ class Mode7:
         py = int(projected_center[0] * SCALE) % self.logic_size[1]
         r, g, b = self.logic_rgb[px][py]
         alpha = self.logic_alpha[px][py]
-        if alpha > 0 and 120 <= r <= 135 and 45 <= g <= 55 and b < 10:
-            self.player.on_dirt = True
-        else:
-            self.player.on_dirt = False
+        
+        self.player.on_dirt = False
+        self.player.on_ice = False
+        if alpha > 0:
+            if 120 <= r <= 135 and 45 <= g <= 55 and b < 10:
+                self.player.on_dirt = True
+            elif r < 50 and g > 200 and b > 200:
+                self.player.on_ice = True
 
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
@@ -438,8 +446,11 @@ class Mode7:
             )
             self.app.screen.blit(logic_text, (20, 200))
             if self.player.on_dirt:
-                dirt_text = self.hud_font.render('ON DIRT', True, (255, 128, 0))
-                self.app.screen.blit(dirt_text, (20, 230))
+                state_text = self.hud_font.render('ON DIRT', True, (255, 128, 0))
+                self.app.screen.blit(state_text, (20, 230))
+            elif self.player.on_ice:
+                state_text = self.hud_font.render('ON ICE', True, (0, 255, 255))
+                self.app.screen.blit(state_text, (20, 230))
 
     def sample_logic_at_player(self):
         px = int(self.player.pos[1] * SCALE) % self.logic_size[0]
