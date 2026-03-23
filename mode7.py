@@ -200,19 +200,6 @@ class Player:
         self.jump_timer = 0
 
 
-class JumpPad:
-    def __init__(self, pos, size):
-        self.pos = np.array(pos, dtype=np.float32)
-        self.size = np.array(size, dtype=np.float32)
-
-    def check_trigger(self, player):
-        if player.z == 0:
-            # Simple AABB check in world coordinates
-            if (self.pos[0] <= player.pos[1] <= self.pos[0] + self.size[0] and
-                self.pos[1] <= player.pos[0] <= self.pos[1] + self.size[1]):
-                player.vz = player.machine.jump_force
-
-
 class Mode7:
     def __init__(self, app):
         self.app = app
@@ -320,6 +307,10 @@ class Mode7:
                 self.player.on_dirt = True
             elif r < 50 and g > 200 and b > 200:
                 self.player.on_ice = True
+            elif r > 200 and g > 200 and b < 50:
+                # Jump Pad Trigger (Yellow)
+                if self.player.z == 0:
+                    self.player.vz = self.player.machine.jump_force
 
         cam_offset = np.array([
             -self.cam_distance * np.cos(self.player.angle),
