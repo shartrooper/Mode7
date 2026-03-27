@@ -139,6 +139,19 @@ class Player:
             steer_scale = self.machine.steer_speed * (0.35 + abs(self.speed) / self.machine.max_speed)
             if self.on_ice:
                 steer_scale *= 0.30  # 70% reduction in steering grip
+                
+            # If shifting in the same direction as turning, boost steer_speed significantly
+            shift_left = keys[pg.K_q]
+            shift_right = keys[pg.K_e]
+            shift_input = 0
+            if shift_left and not shift_right:
+                shift_input = -1
+            elif shift_right and not shift_left:
+                shift_input = 1
+
+            if shift_input == turn_dir:
+                steer_scale *= 1.6  # 60% boost to rotation speed for sharp cornering
+                
             self.angle -= turn_dir * steer_scale * dt
 
         cos_a = np.cos(self.angle)
@@ -171,13 +184,28 @@ class Player:
         elif self.visual_tilt > target_tilt:
             self.visual_tilt = max(self.visual_tilt - tilt_speed, target_tilt)
 
+        # Opposite Shift Drag Penalty (Air Brakes)
+        if shift_input and turn_dir and shift_input != turn_dir:
+            # Shed speed rapidly if we shift opposite the turn (Pivot maneuver)
+            drag = self.speed * (self.machine.friction * 4.0) * dt
+            self.speed -= drag
+            
         self.pos[0] += cos_a * self.speed * dt
         self.pos[1] += sin_a * self.speed * dt
 
         if self.shift_force and self.shift_dir and shift_active:
             side_vec = np.array([-sin_a, cos_a], dtype=np.float32)
             lateral = side_vec * self.shift_force * self.shift_dir * dt
+            
+            # If shifting in the same direction as turning, reduce lateral wide slide and add slight forward zip
+            if shift_input == turn_dir:
+                lateral *= 0.5  # Grip the road more, slide less
+                # forward zip
+                if self.speed > 0:
+                    self.speed += (self.machine.accel * 0.5) * dt
+            
             self.pos += lateral
+
 
     def handle_landing(self):
         # High speed + Long jump requires Nose Down for smooth landing
