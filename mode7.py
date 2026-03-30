@@ -3,6 +3,7 @@ import numpy as np
 from settings import *
 from settings_debug import DEBUG_UI, REMOVE_WALL_COLLISION
 from machine import DOPAMINE_FALCON
+from effects.spark_system import SparkSystem
 from numba import njit, prange
 
 
@@ -250,6 +251,8 @@ class Mode7:
         self.player.machine.load_assets()
         self.alt = CAM_ALT
         self.cam_distance = CAM_DISTANCE
+        
+        self.spark_system = SparkSystem(max_particles=1000)
 
         pg.font.init()
         try:
@@ -349,6 +352,48 @@ class Mode7:
         self.screen_array = self.render_frame(self.floor_array, self.ceil_array, self.screen_array,
                                               self.tex_size, self.ceil_size, self.player.angle, cam_pos, 
                                               self.alt + (self.player.z * 0.1), dynamic_focal_len + shake)
+
+        # Spark Emission Logic
+        # Trigger sparks when tilt is high (shifting weight), on ground, and moving
+        if abs(self.player.visual_tilt) > 0.8 and self.player.z <= 0 and abs(self.player.speed) > self.player.machine.shift_min:
+            # Side: 1.0 is Left tilt (QE shift), -1.0 is Right tilt
+            # If visual_tilt < -0.8 (Left), we want to spawn on the Left wing (side=1.0)
+            side = 1.0 if self.player.visual_tilt < 0 else -1.0
+            cos_a, sin_a = np.cos(self.player.angle), np.sin(self.player.angle)
+            
+            # Wingtip offset (roughly matches 180px wide sprite at j=450)
+            offset_mag = 1 
+            spawn_pos = self.player.pos + np.array([
+                -sin_a * offset_mag * side,
+                cos_a * offset_mag * side
+            ], dtype=np.float32)
+            
+            # Z starts at 0 (contact)
+            spawn_pos_3d = np.array([spawn_pos[0], spawn_pos[1], 0.0], dtype=np.float32)
+            
+            # Velocity: Inherit ship speed but trail behind
+            ship_vel_vec = np.array([cos_a, sin_a, 0.0], dtype=np.float32) * self.player.speed
+            # Sparks move at 60% of ship speed (so they fall behind at 40%)
+            spawn_vel = ship_vel_vec * 0.6
+            
+            self.spark_system.spawn(spawn_pos_3d, spawn_vel, count=3)
+
+        self.spark_system.update(dt)
+
+        # Render sparks into the screen array
+        settings_dict = {
+            'WIDTH': WIDTH,
+            'HEIGHT': HEIGHT,
+            'HALF_WIDTH': HALF_WIDTH,
+            'HALF_HEIGHT': HALF_HEIGHT,
+            'STD_HORIZON': STD_HORIZON,
+            'SCALE': SCALE,
+            'angle': self.player.angle,
+            'cam_pos': cam_pos,
+            'alt': self.alt + (self.player.z * 0.1),
+            'focal_len': dynamic_focal_len + shake
+        }
+        self.spark_system.render(self.screen_array, settings_dict)
 
     def get_projected_world_pos(self, focal_len):
         """
