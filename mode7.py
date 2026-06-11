@@ -361,11 +361,17 @@ class Mode7:
             side = 1.0 if self.player.visual_tilt < 0 else -1.0
             cos_a, sin_a = np.cos(self.player.angle), np.sin(self.player.angle)
             
-            # Wingtip offset (roughly matches 180px wide sprite at j=450)
-            offset_mag = 1 
-            spawn_pos = self.player.pos + np.array([
-                -sin_a * offset_mag * side,
-                cos_a * offset_mag * side
+            # Use the projected world position slightly below the vehicle center (j=560 on screen at HEIGHT=720)
+            sparks_j = int(HEIGHT * 0.75) + 25
+            center_world = self.get_projected_world_pos(dynamic_focal_len + shake, custom_j=sparks_j)
+            
+            # Wingtip offset (0.26 projects to ~80px laterally at j=450)
+            offset_mag = 0.2
+            
+            # Note: get_projected_world_pos returns [py, px] which is [Y, X]
+            spawn_pos = center_world + np.array([
+                cos_a * offset_mag * side,    # Y coordinate
+                -sin_a * offset_mag * side    # X coordinate
             ], dtype=np.float32)
             
             # Z starts at 0 (contact)
@@ -395,7 +401,7 @@ class Mode7:
         }
         self.spark_system.render(self.screen_array, settings_dict)
 
-    def get_projected_world_pos(self, focal_len):
+    def get_projected_world_pos(self, focal_len, custom_j=None):
         """
         Calculates the world position that corresponds to the screen pixel 
         where the ship is visually rendered.
@@ -404,7 +410,7 @@ class Mode7:
         # From draw_vehicle: ground_y = int(HEIGHT * 0.75)
         # We need to match the render_frame logic for screen pixel (i, j)
         i = HALF_WIDTH
-        j = int(HEIGHT * 0.75)
+        j = custom_j if custom_j is not None else int(HEIGHT * 0.75)
         
         # 1. Camera setup (same as render_frame)
         angle = self.player.angle

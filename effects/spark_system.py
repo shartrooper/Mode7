@@ -2,6 +2,64 @@ import numpy as np
 from numba import njit, prange
 import random
 
+"""
+Setup
+Creates a Pool of N particles in memory using NumPy array.
+Each particle is an 11 number array tracking:
+- x, y, z position 
+- vx, vy, vz velocity
+- life life
+- active active
+- seed seed
+- prev_sx prev_sx
+- prev_sy prev_sy
+"""
+
+"""
+Trigger Collision
+SparkSystem.spawn(pos,vel, count=5) called passing the vehicle current 3D position and velocity vector.
+System scans array of N particles looking for the first 5 inactive particles.
+For each dormant particle it finds, it "wakes it up":
+- Position: Sets its x, y, z to exactly where the vehicle grinds floor or hit the wall.
+- Velocity: It inherits the vehicle's vx, vy (so the sparks fly forward with the car), but adds a random 3D "scatter" vector. 
+- This scatter acts as a "grinding cone," launching the sparks slightly outwards and upwards (vz is boosted).
+- Life: Gives it a random lifespan between 0.6 and 1.0 (its "fuel").
+- Active: Sets the active flag to 1.0.
+- Seed: Assigns a random number used later to make the spark flicker.
+"""
+
+"""
+Physics
+update_particles_numba iterates through the particle pool, skips the inactive and process 5 newly active sparks.
+For each spark:
+- Movement: It moves the spark through 3D space by adding its velocity multiplied by dt to its x, y, z position.
+- Gravity: It pulls the spark downwards by reducing its vertical velocity (vz -= gravity * dt).
+- Decay: The spark burns up. Its life value drops slightly (life -= decay_rate * dt).
+- The Ground Check: It checks if the spark's z position has dropped below 0 (the track surface). If it has:
+    - It snaps it back to z = 0.
+    - It reverses and dampens its vertical velocity (vz *= -0.3), creating a small bounce.
+    - It applies friction to its horizontal velocity (vx *= 0.8), slowing it down.
+- Death Check: If the spark's life hits 0, it sets the active flag back to 0.0. It goes back to sleep in the pool.
+"""
+
+"""
+Projection & Rendering
+render_particles_numba figures out how to draw a 3D spark onto a 2D screen.
+For each active spark:
+- Mode7 Inversion (Math Magic): It calculates exactly where the spark is relative to the camera's position and angle. 
+- Using focal length, altitude, and horizon math, it squashes the 3D (x, y, z) coordinates into 2D pixel coordinates (i, j) on your screen. If the spark is behind the camera or off-screen, it skips drawing it to save performance.
+- Color Calculation (get_color): It determines the spark's color based on its remaining life:
+- High Life ($>0.8$): It alternates between bright WHITE and HOT yellow based on its seed and the frame count, creating a rapid flickering effect.
+- Mid Life ($0.4 - 0.8$): It smoothly interpolates from HOT yellow to MID orange.
+- Low Life ($<0.4$): As it dies out, it interpolates from MID orange to a dim COLD red.
+The Motion Blur Trail: To make the spark look fast, it draws a semi-transparent line from its screen position in the previous frame (prev_sx, prev_sy) to its current screen position (i, j).
+The Glowing Head: At its current pixel (i, j), it draws the bright color. It also draws pixels immediately above, below, left, and right at 40% opacity. This creates a tiny cross-shaped "bloom" that makes the spark look like it's glowing intensely.
+Memory: Finally, it updates prev_sx and prev_sy with the current screen coordinates, so the trail can be drawn properly on the next frame.
+"""
+
+
+
+
 # Color constants (R, G, B)
 COLOR_WHITE = np.array([255, 255, 255], dtype=np.float32)
 COLOR_HOT = np.array([255, 255, 0], dtype=np.float32)
@@ -65,7 +123,7 @@ def update_particles_numba(particles, dt, gravity):
 
 @njit(fastmath=True)
 def render_particles_numba(particles, screen_array, width, height, 
-                           half_width, half_height, std_horizon, scale,
+                           half_width, _half_height, std_horizon, _scale,
                            angle, cam_pos, alt, focal_len, frame_count):
     sin_a, cos_a = np.sin(angle), np.cos(angle)
     
@@ -98,22 +156,21 @@ def render_particles_numba(particles, screen_array, width, height,
         # dist_x = rel_x * cos_a + rel_y * sin_a
         # dist_y = -rel_x * sin_a + rel_y * cos_a
         
-        # Mode 7 projection:
-        # Screen J: j = STD_HORIZON + (alt * focal_len) / depth
-        # Where depth is the distance along the camera view axis
-        
+        # Mode 7 exact projection inversion:
         depth = rel_x * sin_a + rel_y * cos_a
+        lateral = rel_x * cos_a - rel_y * sin_a
         if depth <= 0.1: continue # Too close or behind camera
         
-        j = int(std_horizon + (alt * focal_len) / depth)
+        # denom = (depth / alt) - 1.0. If denom ~ 0, it's near the horizon center
+        denom = (depth / alt) - 1.0
+        if abs(denom) < 0.001: continue
+        
+        z_eff = (focal_len + std_horizon) / denom
+        j = int(z_eff + std_horizon)
         if j < 0 or j >= height: continue
         
-        # Screen I: i = HALF_WIDTH - (alt * lateral_offset * focal_len) / (depth * depth)
-        # Wait, the x calculation in render_frame is: x = HALF_WIDTH - i
-        # rx = x * cos + y * sin
-        
-        lateral = rel_x * cos_a - rel_y * sin_a
-        i = int(half_width - (lateral * focal_len) / depth)
+        x_eff = lateral * z_eff / alt
+        i = int(half_width - x_eff)
         
         if i < 0 or i >= width: continue
         
