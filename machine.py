@@ -1,5 +1,8 @@
 import pygame as pg
 
+from settings import HULL_POINTS_MAX
+
+
 class Machine:
     def __init__(self, 
                  max_speed, accel, brake, friction, steer_speed,
@@ -112,6 +115,10 @@ class Machine:
                 ]
             }
         }
+
+        # Machine health
+        self.max_health = HULL_POINTS_MAX
+        self.max_shield = 50.0
 
     def load_one(self, path):
         try:

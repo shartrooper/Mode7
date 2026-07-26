@@ -1,5 +1,7 @@
 import pygame as pg
 import numpy as np
+
+from hud import HealthHUD
 from settings import *
 from settings_debug import DEBUG_UI, REMOVE_WALL_COLLISION
 from machine import DOPAMINE_FALCON
@@ -253,6 +255,7 @@ class Mode7:
         self.cam_distance = CAM_DISTANCE
         
         self.spark_system = SparkSystem(max_particles=1000)
+        self.health_hud = HealthHUD(margins=(20, 20), size=(320, 20))
 
         pg.font.init()
         try:
@@ -447,6 +450,14 @@ class Mode7:
         pg.surfarray.blit_array(self.app.screen, self.screen_array)
         self.draw_vehicle()
         self.draw_hud()
+
+        self.health_hud.draw(
+            screen=self.app.screen,
+            health=100.0,
+            max_health=100.0,
+            shield=40.0,
+            max_shield=50.0
+        )
 
     def draw_vehicle(self):
         ground_y = int(HEIGHT * 0.75)

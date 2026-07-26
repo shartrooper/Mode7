@@ -19,3 +19,6 @@ FPS = 60
 # player tuning constants
 # Starting position is 1640 x 550 divided by scale
 PLAYER_START_POS = (550 / SCALE, 1640 / SCALE)
+
+# HULL
+HULL_POINTS_MAX=100
